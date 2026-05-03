@@ -71,6 +71,25 @@ Pasos típicos:
 
 Si la plataforma solo permite `WORKDIR` dentro de `server/`, mueve este flujo o ajusta rutas en `app.ts`; el diseño actual asume **`dist`** en **padre de `server/`**.
 
+## Vercel (solo frontend estático)
+
+Vercel sirve habitualmente **solo los estáticos** del `npm run build` de Vite. Las peticiones del cliente van a **`/api/...`** en el **mismo dominio** (`import.meta.env.PROD` sin `VITE_API_URL`). Si **no** hay ningún backend detrás de ese dominio, esas rutas **no existen**: obtendrás **404** o una respuesta que **no es JSON**, y en la UI aparecía el mensaje genérico *"Unexpected API error"* (ahora el cliente muestra un texto más claro).
+
+**Opciones coherentes con este repo:**
+
+1. **API en otro host (recomendado con Vercel)**  
+   - Despliega el servidor Express en Render, Railway, Fly.io, etc. (ver sección anterior: `npm run build:deploy`, `node server/dist/server.js`, `JWT_SECRET`).  
+   - En **Vercel → Settings → Environment variables**, define **`VITE_API_URL`** con la URL base de la API, por ejemplo `https://tu-api.onrender.com/api` (sin barra final extra; debe coincidir con cómo montas las rutas en Express).  
+   - **Importante:** Vite sustituye `import.meta.env.VITE_*` en **tiempo de build**. Tras cambiar la variable, haz un **nuevo deploy** / rebuild del proyecto.
+
+2. **Un solo origen (sin Vercel para la API)**  
+   - Un único proceso Node en producción sirve `/api` + estáticos (`docs/deploy.md` ya lo describe). Eso no es el modelo “solo Vercel estático”.
+
+3. **Proxy en Vercel (avanzado)**  
+   - Puedes usar `rewrites` en `vercel.json` para enviar `/api/:path*` a tu backend externo. La URL de destino suele ser fija en el fichero o gestionada según documentación de Vercel.
+
+Mientras no exista una API alcanzable desde el navegador con la URL que usa el build, login y el resto de llamadas fallarán.
+
 ## Checklist antes de abrir al publico
 
 - [ ] `JWT_SECRET` definida y no incluida en el repositorio.

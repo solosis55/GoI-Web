@@ -45,6 +45,19 @@ Web tipo **red social + deporte**: publicar progreso en un feed comunitario, lle
 
    El cliente usa por defecto `http://localhost:4000/api` en modo desarrollo (`src/api/client.ts`).
 
+## Usuarios de prueba (datos locales)
+
+En el fichero **`server/data/store.json`** del repo hay cuentas pensadas para **desarrollo y demos** (misma contraseña para todas). **No uses estas credenciales en producción** ni expongas datos reales en un `store.json` público.
+
+| Usuario   | Email               | Contraseña |
+|-----------|---------------------|--------------|
+| `alice`   | `alice@test.com`    | `123456`     |
+| `bob`     | `bob@test.com`      | `123456`     |
+| `cristian`| `cristian@test.com` | `123456`     |
+| `dana`    | `dana@test.com`     | `123456`     |
+
+Si borras o sustituyes `store.json`, estas cuentas dejan de existir hasta que vuelvas a registrar usuarios o restaures el fichero.
+
 ## Scripts útiles (raíz)
 
 | Script | Descripción |
