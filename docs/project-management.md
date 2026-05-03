@@ -3,9 +3,19 @@
 ## Objetivo
 Organizar el desarrollo de la app (red social + deporte) con pasos claros y accionables.
 
+## Convencion de documentacion
+Cualquier cambio relevante de **producto, UX, API, despliegue o convenciones de codigo** debe reflejarse en los docs del repo, no solo en el codigo. Como minimo revisar y actualizar cuando aplique:
+
+- Raiz: **`README.md`** (alcance, stack, marca, scripts).
+- **`docs/project-management.md`** (estado, checklist, pasos implementados, operativa).
+- **`docs/design.md`** (arquitectura, tokens, decisiones de UI/API).
+- **`docs/components.md`** (props y uso de componentes reutilizables).
+- **`src/pages/README.md`** (comportamiento y presentacion de cada pantalla).
+
 ## Estado
 - Fecha de inicio: 2026-04-27
 - Fase actual: Cierre del MVP y estandarizacion de UI con Tailwind
+- Ultimo refinamiento UX + marca: shell **negro**, marca **GoI** (logo circular centrado en sidebar, tokens **oro/acero**), paneles **zinc** con acentos dorados, formularios con **`.goi-field`**, pulido global (**seleccion de texto**, **scrollbars** oscuros, **`prefers-reduced-motion`**, **focus-visible** en enlaces y botones). **Inicio**: encabezado de pagina, feed a ancho util, historias compactas. **Entrenamientos**: busqueda/orden/lista + sesiones debajo. **Pie** global `SiteFooter`. Detalle en pasos 54–56, 63–68 y en `docs/design.md`.
 
 ## Recomendaciones MVP
 
@@ -89,7 +99,16 @@ Ubicacion: `server/src/__tests__/`. Se ejecutan con Vitest y peticiones HTTP via
 | Borrar entrenamiento de otro usuario | `403`, codigo `WORKOUT_FORBIDDEN`. |
 | Actualizar perfil (`PUT /api/auth/profile/:userId`) con token de otro usuario | `403`, codigo `AUTH_FORBIDDEN`. |
 
-Nota: este archivo guarda y restaura `data/store.json` en `beforeAll` / `afterAll` para no dejar el fichero de persistencia modificado tras la suite.
+### `workout-sessions.test.ts` (sesiones de entreno)
+
+| Escenario | Comportamiento esperado |
+|-----------|-------------------------|
+| Listar sesiones sin token | `401`, codigo `AUTH_HEADER_INVALID`. |
+| Crear sesion con entreno propio | `201`, sesion con `id` y `workoutId`; listado incluye `workoutTitle`. |
+| Crear sesion con entreno ajeno | `403`, codigo `WORKOUT_FORBIDDEN`. |
+| Borrar sesion de otro usuario | `403`, codigo `WORKOUT_SESSION_FORBIDDEN`. |
+
+Nota: `auth-workouts.test.ts` guarda y restaura `data/store.json` en `beforeAll` / `afterAll` para no dejar el fichero de persistencia modificado tras la suite.
 
 ## Mensajes de error (frontend)
 
@@ -171,6 +190,23 @@ Actualizacion reciente:
 49. Se amplio `AuthPage` con flujo "Olvide mi contraseña", formulario de nueva contraseña con enlace `?reset=<token>`, mensaje de exito y alineacion de validacion (minimo 6 caracteres en contraseña). En desarrollo, con `AUTH_RESET_RETURN_TOKEN=true` en el servidor, la API puede devolver `devResetToken` y la UI muestra el enlace local (solo si `import.meta.env.DEV`).
 50. Documentacion sincronizada: `docs/design.md`, `docs/project-management.md`, `src/pages/README.md`, `server/.env.example`.
 51. Despliegue preparado: cliente en modo `production` usa base API `/api` (`src/api/client.ts`); con `NODE_ENV=production` el servidor sirve la SPA desde la carpeta `dist` del monorepo, `trust proxy` para rate limiting tras proxy y guia operativa unificada en `docs/deploy.md`, Dockerfile y scripts `npm run build:deploy` / `npm run start:deploy` en la raiz.
+52. Autenticacion alineada al producto: sin sesion se reutiliza **`social-shell`** (`App.tsx`) con la misma rejilla y sidebar que la app logueada; formulario de auth sobre **card** coherente con el resto de la app; boton **primario** de envio ancho completo; `autocomplete` donde aplica; documentacion en `docs/components.md`, `src/pages/README.md` y este archivo. *(La card de auth paso a tema oscuro y campos `.goi-field` en el paso 54.)*
+53. Identidad GoI en UI: logotipo en **`public/branding/goi-logo.png`**, componente **`GoISidebarBadge`**, tokens **`goi-gold` / `goi-steel`** en `index.css`, shell y sidebar con **fondo negro** y pestaña activa en **oro** (`Button` `navActive`); README y `docs/design.md` actualizados.
+54. Extension de marca GoI en casi toda la UI: **`body`** en negro; **`Card`** con paneles zinc/negro e highlight interior sutil dorado; **`Button`** `primary` en oro (misma linea que `navActive`), `secondary` como pildora clara sobre fondos oscuros, `link` / `linkDark` en tonos oro/acero; clase **`.goi-field`** (`index.css` + `@layer components`) para inputs en feed, entrenos, perfil y auth; componentes de feed/workouts/profile con bordes y textos alineados (p. ej. **StoriesRow** con aro dorado en lugar de acento ajeno al logo).
+55. Sidebar de marca: logo en **contenedor circular** (diametro ~112px escritorio, ~88px movil), imagen con `object-contain`; bloque **`GoISidebarBadge`** centrado en el ancho del lateral (`justify-items-center`, textos centrados).
+56. Pulido CSS global en **`src/index.css`**: **`::selection`** con fondo dorado semitransparente; **scrollbars** oscuros (`scrollbar-color` + estilos WebKit); reglas bajo **`prefers-reduced-motion: reduce`** para acortar animaciones y transiciones; **`a[href]:focus-visible`** con contorno oro. En **`Button`**, anillo **`focus-visible`** oro con `ring-offset-black` para teclado.
+57. Convencion de documentacion explicitada (seccion **Convencion de documentacion** en este archivo) y sincronizacion de **`README.md`**, **`docs/design.md`**, **`docs/components.md`**, **`src/pages/README.md`** con el estado de UI descrito.
+58. Entrenamientos: **`WorkoutForm`** con lista de ejercicios (una fila por ejercicio, añadir/quitar sin comas); visualizacion en **`WorkoutItem`** como lista numerada (`ol`); accion **Duplicar** que crea otro entreno mediante **`POST /workouts`** con titulo `"(copia)"` y recorte si supera **80** caracteres (limite backend). Sin cambios de contrato en API ni en `store.json`.
+59. **Sesiones de entreno:** coleccion **`workoutSessions`** en `store` y API **`/api/workout-sessions`** (`GET` listar propias, `POST` registrar `workoutId` + `performedAt` opcional + `notes` max 500, `DELETE` propia). UI en **`WorkoutSessionsPanel`** + boton **Registrar sesion** en cada **`WorkoutItem`** (scroll al formulario). Tipos en `src/types/workoutSession.ts`, cliente `src/api/workoutSessionsApi.ts`. Tests **`workout-sessions.test.ts`**; `beforeEach` de otras suites limpia `workoutSessions`. Codigos de error en `errorMessages.ts` (`WORKOUT_SESSION_*`).
+60. **Sesiones en perfil:** componente **`WorkoutSessionsHistory`** (lista reutilizable, opcion `showDelete`); **`ProfilePage`** carga **`getWorkoutSessions`** y muestra la misma actividad que en Entrenamientos en solo lectura, con texto que remite a la pestaña Entrenamientos para registrar o borrar.
+61. **Resumen de sesiones en cada tarjeta de entreno:** en **`WorkoutsPage`** un `useMemo` agrega por `workoutId` el **conteo** de sesiones y la **ultima** `performedAt`; **`WorkoutItem`** muestra bloque "Sesiones" (ninguna / N sesiones + fecha ultima con **`formatSessionPerformedAt`**).
+62. **Etiquetas en entrenamientos:** campo **`tags: string[]`** en `Workout` (store + API); **`sanitizeWorkoutTags`** en validacion (tope 12, longitud 20, sin duplicados case-insensitive); formulario **`WorkoutForm`** con lineas de etiquetas; **`WorkoutItem`** chips + **filtro por etiqueta** en `WorkoutsPage`; **`CreatePostForm`** muestra hasta 3 etiquetas en el desplegable de entreno vinculado.
+63. **Feed a ancho util:** en **`FeedPage`** la columna principal deja de caparse a ~680px (`lg:grid-cols-[minmax(0,1fr)_…]`); **`App.tsx`** añade **`min-w-0 w-full`** en **`social-content`** para que la columna del grid use bien el espacio.
+64. **Historias del gym (compacto):** tarjeta con **`max-w-sm`**, padding reducido, titulo y pestañas centrados; **`StoriesRow`** y **`FeedModeTabs`** con prop opcional **`compact`** (avatares y pills mas pequeños).
+65. **`SiteFooter`:** componente **`src/components/layout/SiteFooter.tsx`**; **`App.tsx`** envuelve shell en **`flex min-h-screen flex-col`** con **`SiteFooter`** bajo el `main` (invitado y logueado). Contenido: copyright, texto MVP, enlace Trello **Roadmap**, placeholders Aviso legal / Privacidad / Contacto.
+66. **Encabezado Inicio:** en **`FeedPage`**, bloque **`<header>`** encima de historias (rótulo FitSocial, **Inicio**, descripcion del feed y usuario conectado), estilo alineado a cards oscuras.
+67. **Entrenamientos — lista y sesion:** **`WorkoutsPage`** — campo **buscar por titulo** (case-insensitive, combinable con etiqueta), **ordenar lista** (ultima sesion, mas sesiones, plantilla mas reciente, titulo A-Z); **`WorkoutSessionsPanel`** (registrar + historial) **debajo** de la card **Mis entrenamientos**; **`WorkoutItem`** boton **Registrar sesion** en variante **`primary`** y **`title`** de ayuda; mensaje vacio unificado si filtro titulo+etiqueta no devuelve filas.
+68. **Documentacion:** sincronizados **`README.md`**, **`docs/design.md`**, **`docs/components.md`**, **`src/pages/README.md`** y esta seccion con los puntos 63–67.
 
 ## Recuperacion de contraseña (resumen operativo)
 

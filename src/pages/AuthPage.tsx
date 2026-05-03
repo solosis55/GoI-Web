@@ -10,6 +10,9 @@ import { getErrorMessage } from "../utils/errorMessages";
 
 type AuthView = "register" | "login" | "forgot" | "reset";
 
+const labelClass = "grid gap-1.5 font-semibold text-neutral-200";
+const fieldClass = "goi-field w-full";
+
 export function AuthPage() {
   const { setAuth } = useAuth();
   const rateLimitTimeoutRef = useRef<number | null>(null);
@@ -170,173 +173,195 @@ export function AuthPage() {
           : "Nueva contraseña";
 
   return (
-    <Card className="mx-auto my-8 w-full max-w-[460px] max-md:my-4">
-      <h1>{title}</h1>
-      <p className="mb-3 text-slate-500">MVP social + deporte (localStorage + API)</p>
+    <section className="layout mx-auto w-full max-w-[520px]">
+      <Card tone="dark">
+        <h2 className="text-lg font-semibold text-neutral-100">{title}</h2>
+        <p className="mb-5 mt-1 text-sm text-neutral-400">
+          {view === "register" && "Únete con un usuario, email y contraseña."}
+          {view === "login" && "Introduce tus credenciales para continuar."}
+          {view === "forgot" && "Te enviaremos instrucciones si el correo está registrado."}
+          {view === "reset" && "Define una contraseña nueva para volver a entrar."}
+        </p>
 
-      {(view === "register" || view === "login") && (
-        <form className="grid gap-2.5" onSubmit={handleLoginOrRegister}>
-          {view === "register" && (
-            <label className="grid gap-1.5 font-semibold">
-              Usuario
+        {(view === "register" || view === "login") && (
+          <form className="grid gap-3.5" onSubmit={handleLoginOrRegister}>
+            {view === "register" && (
+              <label className={labelClass}>
+                Usuario
+                <input
+                  className={fieldClass}
+                  required
+                  autoComplete="username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="tu_usuario"
+                />
+              </label>
+            )}
+
+            <label className={labelClass}>
+              Email
               <input
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+                className={fieldClass}
                 required
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="cristianfit"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="tu@email.com"
               />
             </label>
-          )}
 
-          <label className="grid gap-1.5 font-semibold">
-            Email
-            <input
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
-              required
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="tu@email.com"
-            />
-          </label>
+            <label className={labelClass}>
+              Contraseña
+              <input
+                className={fieldClass}
+                required
+                type="password"
+                minLength={6}
+                autoComplete={view === "register" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </label>
 
-          <label className="grid gap-1.5 font-semibold">
-            Contraseña
-            <input
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
-              required
-              type="password"
-              minLength={6}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Mínimo 6 caracteres"
-            />
-          </label>
+            {view === "login" && (
+              <Button
+                type="button"
+                variant="link"
+                className="!mt-0 justify-self-start py-1 text-sm"
+                onClick={() => {
+                  setError("");
+                  setMessage("");
+                  setView("forgot");
+                }}
+              >
+                ¿Olvidaste tu contraseña?
+              </Button>
+            )}
 
-          {view === "login" && (
+            <StatusMessage tone="dark" error={error} success={message} />
+
+            <Button type="submit" disabled={loading || rateLimited} className="w-full">
+              {loading ? "Procesando..." : rateLimited ? "Espera un momento..." : view === "register" ? "Crear cuenta" : "Entrar"}
+            </Button>
+          </form>
+        )}
+
+        {view === "forgot" && (
+          <form className="grid gap-3.5" onSubmit={handleForgotPassword}>
+            <p className="m-0 text-sm leading-relaxed text-neutral-400">
+              Indica el correo de tu cuenta. Si existe, podrás restablecer la contraseña (en producción llegaría un email; en
+              local revisa la documentación y{" "}
+              <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-xs text-goi-gold">
+                AUTH_RESET_RETURN_TOKEN
+              </code>
+              ).
+            </p>
+            <label className={labelClass}>
+              Email
+              <input
+                className={fieldClass}
+                required
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="tu@email.com"
+              />
+            </label>
+            <StatusMessage tone="dark" error={error} success={message} />
+            {devResetHint && (
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-neutral-700 bg-black p-3 text-xs leading-relaxed text-neutral-400">
+                {devResetHint}
+              </pre>
+            )}
+            <Button type="submit" disabled={loading || rateLimited} className="w-full">
+              {loading ? "Enviando..." : rateLimited ? "Espera un momento..." : "Enviar instrucciones"}
+            </Button>
             <Button
               type="button"
               variant="link"
-              className="!mt-0 justify-self-start p-0 text-left text-sm"
+              className="!mt-1"
               onClick={() => {
                 setError("");
                 setMessage("");
-                setView("forgot");
+                setDevResetHint("");
+                setView("login");
               }}
             >
-              ¿Olvidaste tu contraseña?
+              Volver a iniciar sesión
             </Button>
-          )}
+          </form>
+        )}
 
-          <StatusMessage error={error} success={message} />
+        {view === "reset" && (
+          <form className="grid gap-3.5" onSubmit={handleResetPassword}>
+            <p className="m-0 text-sm text-neutral-400">Elige una contraseña nueva para tu cuenta.</p>
+            <label className={labelClass}>
+              Nueva contraseña
+              <input
+                className={fieldClass}
+                required
+                type="password"
+                minLength={6}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </label>
+            <label className={labelClass}>
+              Repetir contraseña
+              <input
+                className={fieldClass}
+                required
+                type="password"
+                minLength={6}
+                autoComplete="new-password"
+                value={confirmNewPassword}
+                onChange={(event) => setConfirmNewPassword(event.target.value)}
+                placeholder="Mínimo 6 caracteres"
+              />
+            </label>
+            <StatusMessage tone="dark" error={error} success={message} />
+            <Button type="submit" disabled={loading || rateLimited || !resetToken} className="w-full">
+              {loading ? "Guardando..." : rateLimited ? "Espera un momento..." : "Guardar nueva contraseña"}
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="!mt-1"
+              onClick={() => {
+                setError("");
+                setMessage("");
+                clearUrlResetParam();
+                setView("login");
+              }}
+            >
+              Volver a iniciar sesión
+            </Button>
+          </form>
+        )}
 
-          <Button type="submit" disabled={loading || rateLimited}>
-            {loading ? "Procesando..." : rateLimited ? "Espera un momento..." : view === "register" ? "Crear cuenta" : "Entrar"}
-          </Button>
-        </form>
-      )}
-
-      {view === "forgot" && (
-        <form className="grid gap-2.5" onSubmit={handleForgotPassword}>
-          <p className="m-0 text-sm text-slate-600">
-            Indica el correo de tu cuenta. Si existe, podrás restablecer la contraseña (en producción llegaría un email; en local
-            configura el servidor con instrucciones en la documentación).
-          </p>
-          <label className="grid gap-1.5 font-semibold">
-            Email
-            <input
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
-              required
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="tu@email.com"
-            />
-          </label>
-          <StatusMessage error={error} success={message} />
-          {devResetHint && (
-            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-slate-100 p-2 text-xs text-slate-800">
-              {devResetHint}
-            </pre>
-          )}
-          <Button type="submit" disabled={loading || rateLimited}>
-            {loading ? "Enviando..." : rateLimited ? "Espera un momento..." : "Enviar instrucciones"}
-          </Button>
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => {
-              setError("");
-              setMessage("");
-              setDevResetHint("");
-              setView("login");
-            }}
-          >
-            Volver a iniciar sesión
-          </Button>
-        </form>
-      )}
-
-      {view === "reset" && (
-        <form className="grid gap-2.5" onSubmit={handleResetPassword}>
-          <p className="m-0 text-sm text-slate-600">Elige una contraseña nueva para tu cuenta.</p>
-          <label className="grid gap-1.5 font-semibold">
-            Nueva contraseña
-            <input
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
-              required
-              type="password"
-              minLength={6}
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              placeholder="Mínimo 6 caracteres"
-            />
-          </label>
-          <label className="grid gap-1.5 font-semibold">
-            Repetir contraseña
-            <input
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
-              required
-              type="password"
-              minLength={6}
-              value={confirmNewPassword}
-              onChange={(event) => setConfirmNewPassword(event.target.value)}
-              placeholder="Mínimo 6 caracteres"
-            />
-          </label>
-          <StatusMessage error={error} success={message} />
-          <Button type="submit" disabled={loading || rateLimited || !resetToken}>
-            {loading ? "Guardando..." : rateLimited ? "Espera un momento..." : "Guardar nueva contraseña"}
-          </Button>
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => {
-              setError("");
-              setMessage("");
-              clearUrlResetParam();
-              setView("login");
-            }}
-          >
-            Volver a iniciar sesión
-          </Button>
-        </form>
-      )}
-
-      {(view === "register" || view === "login") && (
-        <Button
-          type="button"
-          variant="link"
-          onClick={() => {
-            setError("");
-            setMessage("");
-            setView((v) => (v === "register" ? "login" : "register"));
-          }}
-        >
-          {view === "register" ? "Ya tengo cuenta" : "No tengo cuenta aún"}
-        </Button>
-      )}
-    </Card>
+        {(view === "register" || view === "login") && (
+          <div className="mt-6 border-t border-neutral-700 pt-4">
+            <Button
+              type="button"
+              variant="link"
+              className="!mt-0 w-full"
+              onClick={() => {
+                setError("");
+                setMessage("");
+                setView((v) => (v === "register" ? "login" : "register"));
+              }}
+            >
+              {view === "register" ? "Ya tengo cuenta" : "No tengo cuenta aún"}
+            </Button>
+          </div>
+        )}
+      </Card>
+    </section>
   );
 }

@@ -10,7 +10,7 @@ export function CommentList({ comments, currentUserId }: CommentListProps) {
     <ul className="my-2 list-disc pl-4">
       {comments.map((comment) => (
         <li key={comment.id}>
-          <small className="text-slate-300">
+          <small className="text-neutral-400">
             {comment.authorUsername}
             {comment.userId === currentUserId ? " (tu)" : ""}: {comment.content}
           </small>

@@ -23,6 +23,7 @@ describe("auth + workouts security flow", () => {
   beforeEach(() => {
     store.users = [];
     store.workouts = [];
+    store.workoutSessions = [];
     store.posts = [];
     store.likes = [];
     store.comments = [];
@@ -69,6 +70,7 @@ describe("auth + workouts security flow", () => {
     expect(response.status).toBe(201);
     expect(response.body.id).toBeTruthy();
     expect(response.body.title).toBe("Secure workout");
+    expect(Array.isArray(response.body.tags)).toBe(true);
   });
 
   it("prevents deleting workout owned by another user", async () => {

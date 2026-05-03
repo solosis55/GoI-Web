@@ -13,6 +13,7 @@ describe("posts security flow", () => {
   beforeEach(() => {
     store.users = [];
     store.workouts = [];
+    store.workoutSessions = [];
     store.posts = [];
     store.likes = [];
     store.comments = [];

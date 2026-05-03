@@ -1,12 +1,18 @@
 import { Request, Response } from "express";
 import { createId, saveStore, store, Workout } from "../services/store.js";
 import { sendError } from "../services/http.js";
-import { isLengthBetween, sanitizeStringArray, sanitizeText } from "../services/validation.js";
+import {
+  isLengthBetween,
+  sanitizeStringArray,
+  sanitizeText,
+  sanitizeWorkoutTags,
+} from "../services/validation.js";
 
 type WorkoutPayload = {
   title?: string;
   description?: string;
   exercises?: string[];
+  tags?: string[];
 };
 
 export function listWorkouts(_req: Request, res: Response) {
@@ -15,10 +21,11 @@ export function listWorkouts(_req: Request, res: Response) {
 
 export function createWorkout(req: Request, res: Response) {
   const authUserId = String(res.locals.authUserId ?? "");
-  const { title, description = "", exercises = [] } = req.body as WorkoutPayload;
+  const { title, description = "", exercises = [], tags: rawTags } = req.body as WorkoutPayload;
   const normalizedTitle = sanitizeText(title);
   const normalizedDescription = sanitizeText(description);
   const normalizedExercises = sanitizeStringArray(exercises);
+  const normalizedTags = sanitizeWorkoutTags(rawTags ?? []);
 
   if (!authUserId || !isLengthBetween(normalizedTitle, 3, 80)) {
     sendError(res, 400, "WORKOUT_INVALID_INPUT", "title is required");
@@ -39,6 +46,7 @@ export function createWorkout(req: Request, res: Response) {
     title: normalizedTitle,
     description: normalizedDescription,
     exercises: normalizedExercises,
+    tags: normalizedTags,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -89,6 +97,11 @@ export function updateWorkout(req: Request, res: Response) {
     }
     workout.exercises = normalizedExercises;
   }
+
+  if (payload.tags !== undefined) {
+    workout.tags = sanitizeWorkoutTags(payload.tags);
+  }
+
   workout.updatedAt = new Date().toISOString();
 
   saveStore();

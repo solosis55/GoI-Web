@@ -175,13 +175,30 @@ export function FeedPage() {
   }
 
   return (
-    <section className="feed-layout grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,680px)_minmax(240px,320px)]">
-      <section className="feed-main grid gap-3.5">
-        <Card tone="dark">
-          <h2>Historias del gym</h2>
-          <FeedModeTabs mode={feedMode} onChangeMode={setFeedMode} />
-          <StoriesRow posts={posts} />
-        </Card>
+    <section className="feed-layout grid w-full min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:gap-6">
+      <section className="feed-main grid w-full min-w-0 gap-3.5 lg:gap-4">
+        <header className="feed-page-header rounded-lg border border-neutral-800 bg-zinc-950/90 px-4 py-4 shadow-[inset_0_1px_0_0_rgba(212,175,55,0.07)] sm:px-5 sm:py-5">
+          <p className="text-xs font-medium uppercase tracking-wider text-goi-gold-dim">FitSocial</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-neutral-100 sm:text-2xl">Inicio</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-neutral-500">
+            Tu feed de la comunidad: historias, publicaciones y conversación con otros usuarios.
+            {user?.username ? (
+              <span className="text-neutral-400"> Conectado como @{user.username}.</span>
+            ) : null}
+          </p>
+        </header>
+
+        <div className="mx-auto w-full max-w-sm">
+          <Card tone="dark" className="!p-2 max-w-full rounded-lg">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <h2 className="text-sm font-semibold tracking-tight text-neutral-200">Historias del gym</h2>
+              <div className="flex w-full justify-center">
+                <FeedModeTabs mode={feedMode} onChangeMode={setFeedMode} compact />
+              </div>
+              <StoriesRow posts={posts} compact />
+            </div>
+          </Card>
+        </div>
 
         <Card tone="dark">
           <h2>Crear publicacion</h2>
@@ -195,7 +212,7 @@ export function FeedPage() {
           />
         </Card>
 
-        <StatusMessage loading={loading} error={error} success={message} />
+        <StatusMessage tone="dark" loading={loading} error={error} success={message} />
         {!loading && visiblePosts.length === 0 && (
           <EmptyState
             message={
@@ -230,10 +247,10 @@ export function FeedPage() {
         </ul>
       </section>
 
-      <Card as="aside" tone="dark" className="feed-right sticky top-4 max-lg:static">
+      <Card as="aside" tone="dark" className="feed-right min-w-0 w-full sticky top-4 max-lg:static">
         <UserSummaryCard username={user?.username} myPostsCount={myPostsCount} />
         <h3>Sugerencias para ti</h3>
-        {suggestedUsers.length === 0 && <EmptyState message="Aun no hay sugerencias." className="mt-2 text-slate-400" />}
+        {suggestedUsers.length === 0 && <EmptyState message="Aun no hay sugerencias." className="mt-2" />}
         <ul className="suggestions-list mt-2 grid list-none gap-2.5 p-0">
           {suggestedUsers.map((suggested) => (
             <FollowSuggestionItem

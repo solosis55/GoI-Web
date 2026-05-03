@@ -36,7 +36,7 @@ export function ProfileForm({
       <label className="grid gap-1.5 font-semibold">
         Usuario
         <input
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+          className="goi-field"
           required
           value={username}
           onChange={(event) => onChangeUsername(event.target.value)}
@@ -45,7 +45,7 @@ export function ProfileForm({
       <label className="grid gap-1.5 font-semibold">
         Objetivo deportivo
         <input
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+          className="goi-field"
           value={goal}
           onChange={(event) => onChangeGoal(event.target.value)}
           placeholder="Ganar fuerza"
@@ -54,7 +54,7 @@ export function ProfileForm({
       <label className="grid gap-1.5 font-semibold">
         URL foto de perfil
         <input
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+          className="goi-field"
           value={avatarUrl}
           onChange={(event) => onChangeAvatarUrl(event.target.value)}
           placeholder="https://..."
@@ -63,14 +63,14 @@ export function ProfileForm({
       <label className="grid gap-1.5 font-semibold">
         Bio
         <textarea
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+          className="goi-field min-h-[80px]"
           value={bio}
           onChange={(event) => onChangeBio(event.target.value)}
           placeholder="Entreno 5 dias por semana..."
         />
       </label>
 
-      <StatusMessage error={error} success={message} />
+      <StatusMessage tone="dark" error={error} success={message} />
 
       <Button type="submit" disabled={loading}>
         {loading ? "Guardando..." : "Guardar perfil"}

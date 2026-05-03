@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sanitizeWorkoutTags } from "./validation.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,8 +26,21 @@ export type Workout = {
   title: string;
   description: string;
   exercises: string[];
+  /** Etiquetas libres (p. ej. "pecho", "tiron") para filtrar y organizar. */
+  tags: string[];
   createdAt: string;
   updatedAt: string;
+};
+
+/** Registro de que el usuario realizo un entrenamiento (plantilla) en una fecha. */
+export type WorkoutSession = {
+  id: string;
+  userId: string;
+  workoutId: string;
+  /** ISO 8601 (instante aproximado de la sesion). */
+  performedAt: string;
+  notes: string;
+  createdAt: string;
 };
 
 export type Post = {
@@ -64,6 +78,7 @@ export type Follow = {
 export const store = {
   users: [] as User[],
   workouts: [] as Workout[],
+  workoutSessions: [] as WorkoutSession[],
   posts: [] as Post[],
   likes: [] as Like[],
   comments: [] as Comment[],
@@ -81,6 +96,7 @@ export function createId() {
 type PersistedStore = {
   users: User[];
   workouts: Workout[];
+  workoutSessions?: WorkoutSession[];
   posts: Post[];
   likes: Like[];
   comments: Comment[];
@@ -105,7 +121,13 @@ export function initializeStore() {
         updatedAt: user.updatedAt ?? user.createdAt ?? new Date().toISOString(),
       }))
     : [];
-  store.workouts = Array.isArray(parsed.workouts) ? parsed.workouts : [];
+  store.workouts = Array.isArray(parsed.workouts)
+    ? parsed.workouts.map((w) => ({
+        ...w,
+        tags: sanitizeWorkoutTags(Array.isArray(w.tags) ? w.tags : []),
+      }))
+    : [];
+  store.workoutSessions = Array.isArray(parsed.workoutSessions) ? parsed.workoutSessions : [];
   store.posts = Array.isArray(parsed.posts) ? parsed.posts : [];
   store.likes = Array.isArray(parsed.likes) ? parsed.likes : [];
   store.comments = Array.isArray(parsed.comments) ? parsed.comments : [];

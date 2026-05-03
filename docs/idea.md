@@ -17,3 +17,6 @@ Funcionalidades opcionales:
 -Estadisticas personales
 -Chat privado
 
+---
+
+Nota: el avance del MVP, la UI (marca **FitSocial** / **GoI**) y la convencion de **actualizar la documentacion** en cada iteracion estan descritos en **`README.md`**, **`docs/project-management.md`** y **`docs/design.md`**.

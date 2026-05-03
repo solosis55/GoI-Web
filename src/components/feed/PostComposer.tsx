@@ -10,7 +10,7 @@ export function PostComposer({ value, onChange, onSubmit }: PostComposerProps) {
   return (
     <div className="inline-actions mt-2 flex gap-2">
       <input
-        className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+        className="goi-field flex-1 min-w-0"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Escribe un comentario"

@@ -49,17 +49,6 @@
   ],
   "workouts": [
     {
-      "id": "ca995da0-c5d6-4c1e-8d3c-1428adf0d008",
-      "userId": "d27a0820-c0c1-4327-afd0-9940a07dae0e",
-      "title": "dasd",
-      "description": "asdsad",
-      "exercises": [
-        "asdad"
-      ],
-      "createdAt": "2026-05-03T17:10:02.431Z",
-      "updatedAt": "2026-05-03T17:10:02.431Z"
-    },
-    {
       "id": "9ffeb975-3407-4173-bfbc-c127190afdbe",
       "userId": "f26a4d59-2d18-4063-a475-7c6d43826e7c",
       "title": "asd",
@@ -67,30 +56,31 @@
       "exercises": [
         "ads"
       ],
+      "tags": [],
       "createdAt": "2026-05-03T17:12:13.272Z",
       "updatedAt": "2026-05-03T17:12:13.272Z"
     },
     {
-      "id": "edd4d123-24b8-4cee-8436-e7617d916ec1",
+      "id": "225c85ca-2a6d-4a94-a80d-0ead6d941640",
       "userId": "d27a0820-c0c1-4327-afd0-9940a07dae0e",
-      "title": "adssadas",
-      "description": "asdasd",
+      "title": "Pecho Triceps",
+      "description": "",
       "exercises": [
-        "adsadsas"
+        "Press de banca"
       ],
-      "createdAt": "2026-05-03T17:13:20.451Z",
-      "updatedAt": "2026-05-03T17:13:20.451Z"
-    },
+      "tags": [],
+      "createdAt": "2026-05-03T18:35:31.055Z",
+      "updatedAt": "2026-05-03T18:35:31.055Z"
+    }
+  ],
+  "workoutSessions": [
     {
-      "id": "34971d14-2697-40c4-9b53-cd65710c4f15",
+      "id": "347c3dfe-146e-47ac-b003-f4ca1c35a586",
       "userId": "d27a0820-c0c1-4327-afd0-9940a07dae0e",
-      "title": "dasasdsa",
-      "description": "asdasd",
-      "exercises": [
-        "asdasd"
-      ],
-      "createdAt": "2026-05-03T17:15:43.119Z",
-      "updatedAt": "2026-05-03T17:15:43.119Z"
+      "workoutId": "225c85ca-2a6d-4a94-a80d-0ead6d941640",
+      "performedAt": "2026-05-03T19:10:00.000Z",
+      "notes": "",
+      "createdAt": "2026-05-03T19:10:07.698Z"
     }
   ],
   "posts": [

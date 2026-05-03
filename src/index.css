@@ -1,14 +1,77 @@
 @import "tailwindcss";
 
+/* Paleta alineada con el logotipo GoI (Group of Iron): negro, acero metalizado, oro. */
+@theme {
+  --color-goi-gold: #d4af37;
+  --color-goi-gold-dim: #b8922a;
+  --color-goi-steel: #c8c4d4;
+}
+
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background-color: rgba(212, 175, 55, 0.38);
+  color: #0a0a0a;
+}
+
+html {
+  scrollbar-color: #404040 #080808;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #3f3f3f;
+  border-radius: 6px;
+  border: 2px solid #0a0a0a;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer base {
+  :where(a[href]):focus-visible {
+    outline: 2px solid rgba(212, 175, 55, 0.9);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Campos sobre paneles oscuros (feed, entrenos, perfil, auth). */
+  .goi-field {
+    @apply rounded-lg border border-neutral-600 bg-black px-3 py-2 text-goi-steel placeholder:text-neutral-500 outline-none transition focus:border-goi-gold focus:ring-2 focus:ring-goi-gold/25;
+  }
 }
 
 body {
   margin: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: #f3f4f6;
-  color: #111827;
+  background: #000000;
+  color: #d4d4d8;
 }
 
 h1,

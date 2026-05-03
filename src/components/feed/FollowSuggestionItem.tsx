@@ -12,7 +12,7 @@ export function FollowSuggestionItem({ user, isFollowing, onToggleFollow }: Foll
   return (
     <li className="flex items-center gap-2.5">
       <Avatar src={user.avatarUrl} alt={user.username} size={32} />
-      <span className="text-slate-200">{user.username}</span>
+      <span className="text-goi-steel">{user.username}</span>
       <Button type="button" variant="secondary" onClick={() => onToggleFollow(user.id)}>
         {isFollowing ? "Siguiendo" : "Seguir"}
       </Button>

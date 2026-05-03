@@ -23,6 +23,9 @@ const codeMessageMap: Record<string, string> = {
   WORKOUT_INVALID_INPUT: "Revisa título, descripción o ejercicios del entrenamiento.",
   POST_NOT_FOUND: "La publicación no existe o fue eliminada.",
   WORKOUT_NOT_FOUND: "El entrenamiento no existe o fue eliminado.",
+  WORKOUT_SESSION_INVALID_INPUT: "Revisa la fecha y las notas de la sesión (máximo 500 caracteres).",
+  WORKOUT_SESSION_NOT_FOUND: "Esa sesión ya no existe.",
+  WORKOUT_SESSION_FORBIDDEN: "No puedes modificar esta sesión.",
 };
 
 export function getErrorMessage(error: unknown, fallback: string) {

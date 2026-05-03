@@ -24,7 +24,7 @@ export function CreatePostForm({
       <label className="grid gap-1.5 font-semibold">
         Contenido
         <textarea
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+          className="goi-field min-h-[96px]"
           required
           value={content}
           onChange={(event) => onChangeContent(event.target.value)}
@@ -35,16 +35,24 @@ export function CreatePostForm({
       <label className="grid gap-1.5 font-semibold">
         Entrenamiento vinculado (opcional)
         <select
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-violet-500"
+          className="goi-field"
           value={selectedWorkoutId}
           onChange={(event) => onChangeWorkoutId(event.target.value)}
         >
           <option value="">Sin entrenamiento</option>
-          {workouts.map((workout) => (
-            <option key={workout.id} value={workout.id}>
-              {workout.title}
-            </option>
-          ))}
+          {workouts.map((workout) => {
+            const tagHint = (workout.tags ?? []).filter(Boolean);
+            const hint =
+              tagHint.length > 0
+                ? ` — ${tagHint.slice(0, 3).join(", ")}${tagHint.length > 3 ? "…" : ""}`
+                : "";
+            return (
+              <option key={workout.id} value={workout.id}>
+                {workout.title}
+                {hint}
+              </option>
+            );
+          })}
         </select>
       </label>
 

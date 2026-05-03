@@ -29,16 +29,16 @@ export function PostItem({
   formatDate,
 }: PostItemProps) {
   return (
-    <li className="flex items-start justify-between gap-3 rounded-lg border border-slate-800 bg-slate-900 p-3 max-md:flex-col">
+    <li className="flex items-start justify-between gap-3 rounded-lg border border-neutral-800 bg-black/60 p-3 shadow-[inset_0_1px_0_0_rgba(212,175,55,0.06)] max-md:flex-col">
       <div>
-        <strong className="text-slate-100">
+        <strong className="text-neutral-100">
           {post.authorUsername}
           {isOwner ? " (tu)" : ""}
         </strong>
-        <p className="mt-2 text-slate-400">{formatDate(post.createdAt)}</p>
-        <p className="text-slate-200">{post.content}</p>
-        {post.workoutId && <small className="text-slate-300">Entrenamiento: {getWorkoutTitle(post.workoutId)}</small>}
-        <p className="mt-2 text-slate-400">Likes: {post.likesCount}</p>
+        <p className="mt-2 text-neutral-500">{formatDate(post.createdAt)}</p>
+        <p className="text-goi-steel">{post.content}</p>
+        {post.workoutId && <small className="text-neutral-400">Entrenamiento: {getWorkoutTitle(post.workoutId)}</small>}
+        <p className="mt-2 text-neutral-500">Likes: {post.likesCount}</p>
         <CommentList comments={post.comments} currentUserId={currentUserId} />
         <PostComposer value={commentValue} onChange={onChangeComment} onSubmit={onComment} />
       </div>

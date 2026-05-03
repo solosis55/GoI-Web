@@ -4,6 +4,5 @@ type EmptyStateProps = {
 };
 
 export function EmptyState({ message, className = "" }: EmptyStateProps) {
-  const classes = ["empty-state", className].filter(Boolean).join(" ");
-  return <p className={classes}>{message}</p>;
+  return <p className={["empty-state text-neutral-500", className].filter(Boolean).join(" ")}>{message}</p>;
 }

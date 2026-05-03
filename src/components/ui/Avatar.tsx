@@ -12,7 +12,7 @@ export function Avatar({ src, alt, size = 32, className = "" }: AvatarProps) {
     <img
       src={src || FALLBACK_AVATAR}
       alt={alt}
-      className={className}
+      className={["rounded-full object-cover ring-2 ring-neutral-800", className].filter(Boolean).join(" ")}
       style={{ width: size, height: size }}
     />
   );

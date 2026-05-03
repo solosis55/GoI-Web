@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { getProfile, updateProfile } from "../api/authApi";
+import { getWorkoutSessions } from "../api/workoutSessionsApi";
 import { ProfileForm } from "../components/profile/ProfileForm";
+import { WorkoutSessionsHistory } from "../components/workouts/WorkoutSessionsHistory";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../context/AuthContext";
+import type { WorkoutSessionWithTitle } from "../types/workoutSession";
 import { getErrorMessage } from "../utils/errorMessages";
 
 export function ProfilePage() {
@@ -15,6 +18,9 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [sessions, setSessions] = useState<WorkoutSessionWithTitle[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState("");
 
   useEffect(() => {
     async function loadProfile() {
@@ -37,6 +43,31 @@ export function ProfilePage() {
     }
 
     void loadProfile();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function loadSessions() {
+      setSessionsLoading(true);
+      setSessionsError("");
+      try {
+        const list = await getWorkoutSessions();
+        if (!cancelled) setSessions(list);
+      } catch (loadError) {
+        if (!cancelled) {
+          setSessionsError(getErrorMessage(loadError, "No se pudieron cargar las sesiones"));
+        }
+      } finally {
+        if (!cancelled) setSessionsLoading(false);
+      }
+    }
+
+    void loadSessions();
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -85,23 +116,36 @@ export function ProfilePage() {
   }
 
   return (
-    <Card>
-      <h2>Mi perfil</h2>
-      <p className="mb-3 text-slate-500">Configura tu identidad deportiva para la parte social</p>
-      <ProfileForm
-        username={username}
-        goal={goal}
-        avatarUrl={avatarUrl}
-        bio={bio}
-        loading={loading}
-        error={error}
-        message={message}
-        onChangeUsername={setUsername}
-        onChangeGoal={setGoal}
-        onChangeAvatarUrl={setAvatarUrl}
-        onChangeBio={setBio}
-        onSubmit={handleSubmit}
+    <section className="layout grid gap-4">
+      <Card>
+        <h2>Mi perfil</h2>
+        <p className="mb-3 text-neutral-500">Configura tu identidad deportiva para la parte social</p>
+        <ProfileForm
+          username={username}
+          goal={goal}
+          avatarUrl={avatarUrl}
+          bio={bio}
+          loading={loading}
+          error={error}
+          message={message}
+          onChangeUsername={setUsername}
+          onChangeGoal={setGoal}
+          onChangeAvatarUrl={setAvatarUrl}
+          onChangeBio={setBio}
+          onSubmit={handleSubmit}
+        />
+      </Card>
+
+      {sessionsError ? <p className="m-0 text-sm text-red-400">{sessionsError}</p> : null}
+
+      <WorkoutSessionsHistory
+        title="Sesiones registradas"
+        description="Lo que anotas en Entrenamientos aparece aqui. Para registrar nuevas sesiones o quitarlas del historial, usa la pestaña Entrenamientos."
+        sessions={sessions}
+        loading={sessionsLoading}
+        emptyMessage="Aun no hay sesiones. Registralas en la pestaña Entrenamientos."
+        showDelete={false}
       />
-    </Card>
+    </section>
   );
 }
