@@ -5,11 +5,13 @@ type GoISidebarBadgeProps = {
   subtitle: ReactNode;
   /** Párrafo opcional (solo escritorio típico en login). */
   description?: ReactNode;
+  /** Si hay `description`, mostrarla también en móvil (p. ej. pantalla auth sin sidebar). */
+  showDescriptionOnMobile?: boolean;
 };
 
 const LOGO_SRC = "/branding/goi-logo.png";
 
-export function GoISidebarBadge({ subtitle, description }: GoISidebarBadgeProps) {
+export function GoISidebarBadge({ subtitle, description, showDescriptionOnMobile }: GoISidebarBadgeProps) {
   return (
     <div className="sidebar-brand-goi grid w-full justify-items-center gap-2">
       <div className="flex h-[112px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-950 ring-2 ring-goi-gold-dim/30 shadow-[0_8px_28px_rgba(0,0,0,0.55)] max-md:h-[88px] max-md:w-[88px]">
@@ -26,7 +28,11 @@ export function GoISidebarBadge({ subtitle, description }: GoISidebarBadgeProps)
       </p>
       <div className="sidebar-user w-full text-center text-sm text-neutral-400">{subtitle}</div>
       {description && (
-        <p className="mt-3 hidden max-w-[18rem] text-center text-sm leading-relaxed text-neutral-500 md:block">{description}</p>
+        <p
+          className={`mt-3 max-w-[20rem] text-center text-sm leading-relaxed text-neutral-500 ${showDescriptionOnMobile ? "" : "hidden md:block"}`}
+        >
+          {description}
+        </p>
       )}
     </div>
   );

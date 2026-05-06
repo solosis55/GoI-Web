@@ -65,6 +65,60 @@ html {
   .goi-field {
     @apply rounded-lg border border-neutral-600 bg-black px-3 py-2 text-goi-steel placeholder:text-neutral-500 outline-none transition focus:border-goi-gold focus:ring-2 focus:ring-goi-gold/25;
   }
+
+  /* Dropdown de notificaciones en el feed. */
+  .feed-notif-panel-animate {
+    animation: feed-notif-pop 0.22s ease-out both;
+  }
+
+  /** Barra horizontal de historia (visor). Reinicia cada slide con nueva `key`. */
+  .story-segment-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    transform-origin: left center;
+    animation: fitsocial-story-bar var(--story-segment-ms, 5600ms) linear forwards;
+  }
+}
+
+@keyframes feed-notif-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes feedBellBadge {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.88);
+  }
+
+  60% {
+    transform: scale(1.06);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fitsocial-story-bar {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
 }
 
 body {

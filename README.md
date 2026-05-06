@@ -52,12 +52,12 @@ En el fichero **`server/data/store.json`** del repo hay cuentas pensadas para **
 
 | Usuario   | Email               | Contraseña |
 |-----------|---------------------|--------------|
-| `alice`   | `alice@test.com`    | `123456`     |
-| `bob`     | `bob@test.com`      | `123456`     |
-| `cristian`| `cristian@test.com` | `123456`     |
-| `dana`    | `dana@test.com`     | `123456`     |
+| `alice`    | `alice@test.com`     | `123456`     |
+| `bob`      | `bob@test.com`       | `123456`     |
+| `cristian` | `cristian@test.com`  | `123456`     |
+| `dana`     | `dana@test.com`      | `123456`     |
 
-Si borras o sustituyes `store.json`, estas cuentas dejan de existir hasta que vuelvas a registrar usuarios o restaures el fichero. Para recrearlas: en la raíz del repo, `npm run seed:demo-users` (o dentro de `server/`, `npm run seed:demo-users`); el script solo añade emails que aún no estén en el store. **Tras el seed o al editar `store.json` a mano, reinicia el servidor de la API** (`npm run dev` en `server/`): el fichero solo se lee al arrancar. Si el login sigue fallando, en la consola del backend (modo desarrollo) verás cuántos usuarios se cargaron y desde qué ruta; comprueba también que el front apunte a esa API (por defecto `http://localhost:4000/api` en desarrollo, o la URL de `VITE_API_URL` si la definiste al construir el cliente).
+Las cuatro cuentas se crean con **objetivo y bio de ejemplo** (datos públicos coherentes para demos). Si borras o sustituyes `store.json`, dejan de existir hasta registrar de nuevo o restaurar el fichero. Para recrear solo estas cuentas: en la raíz del repo, `npm run seed:demo-users` (o dentro de `server/`, igual); el script **solo añade** registros cuyo **email** aún no esté en el store. Si quieres dejar las cuentas demo en un estado conocido (incluida la contraseña `123456`), usa **`npm run reset:demo-users`**: hace upsert de las cuatro y restablece su perfil/credenciales según `server/src/data/demoUsers.ts`. **`npm test` en `server/` no escribe cambios en `store.json`** (Vitest usa el store en memoria). Si un `store.json` antiguo quedó solo con usuarios ficticios de pruebas, vacía `"users": []` y ejecuta el seed para volver a las cuatro cuentas. **Tras seed/reset o editar `store.json`**, reinicia el API (`npm run dev` en `server/`): el fichero solo se lee al arrancar. Si el login con `*@test.com` / `123456` dice “incorrectos”, el proceso del API seguramente lleva datos viejos en memoria (no recargó el JSON): cierra ese terminal o mata el puerto **`4000`** y vuelve a levantar el servidor. En local, **`GET http://localhost:4000/api/health`** incluye **`devStore.usersLoaded`**: debe coincidir con el número de cuentas esperadas en `store.json` (las cuatro demo → `4`). Si el login falla, en consola verás usuarios cargados y ruta; comprueba también que el front apunte al API (`http://localhost:4000/api` por defecto, o `VITE_API_URL` en build).
 
 **Vercel:** si no configuras **`JWT_SECRET`**, el servidor usa un secreto automático derivado de variables que Vercel inyecta (`VERCEL_URL`, etc.) para que el login funcione en demos. Para **dominio propio o datos sensibles**, define siempre **`JWT_SECRET`** en el dashboard y redeploy. Detalle en **`docs/deploy.md`**.
 
@@ -72,6 +72,7 @@ Si borras o sustituyes `store.json`, estas cuentas dejan de existir hasta que vu
 | `npm run start:deploy` | Ejecuta `node server/dist/server.js` (**desde la raíz del repo**, con `NODE_ENV=production` y frontend ya construido). |
 | `npm run lint` | ESLint sobre el frontend. |
 | `npm run seed:demo-users` | Crea en `server/data/store.json` las cuentas de prueba del README (si faltan). |
+| `npm run reset:demo-users` | Restaura las cuentas demo (upsert) y vuelve sus passwords al valor del seed. |
 
 En `server/`: `npm test` ejecuta Vitest.
 

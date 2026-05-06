@@ -9,6 +9,9 @@ export type SafeUser = {
   updatedAt: string;
 };
 
+/** Respuesta de `GET /auth/profile/:id`: el correo solo va incluido si miras tu propio perfil. */
+export type ProfileUser = Omit<SafeUser, "email"> & { email?: string };
+
 export type AuthResponse = {
   message: string;
   user: SafeUser;
@@ -37,13 +40,13 @@ export type ResetPasswordInput = {
   password: string;
 };
 
-export type UpdateProfileInput = {
+export type UpdateProfileInput = Partial<{
   username: string;
   bio: string;
   goal: string;
   avatarUrl: string;
-};
+}>;
 
-export type DiscoverUser = SafeUser & {
+export type DiscoverUser = ProfileUser & {
   isFollowing: boolean;
 };

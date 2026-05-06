@@ -4,6 +4,7 @@ import type {
   DiscoverUser,
   ForgotPasswordResponse,
   LoginInput,
+  ProfileUser,
   RegisterInput,
   ResetPasswordInput,
   SafeUser,
@@ -39,7 +40,7 @@ export function resetPasswordWithToken(input: ResetPasswordInput) {
 }
 
 export function getProfile(userId: string) {
-  return apiFetch<{ user: SafeUser }>(`/auth/profile/${userId}`);
+  return apiFetch<{ user: ProfileUser }>(`/auth/profile/${userId}`);
 }
 
 export function updateProfile(userId: string, input: UpdateProfileInput) {

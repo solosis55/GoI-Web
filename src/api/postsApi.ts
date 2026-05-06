@@ -1,5 +1,10 @@
 import { apiFetch } from "./client";
-import type { CreateCommentInput, CreatePostInput, Post } from "../types/post";
+import type {
+  CreateCommentInput,
+  CreatePostInput,
+  NotificationsResponse,
+  Post,
+} from "../types/post";
 
 export function getPosts() {
   return apiFetch<Post[]>("/posts");
@@ -18,6 +23,16 @@ export function deletePost(id: string) {
   });
 }
 
+export function updatePost(
+  id: string,
+  input: { content: string; visibility: "public" | "followers" | "private" },
+) {
+  return apiFetch<Post>(`/posts/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
 export function toggleLike(postId: string) {
   return apiFetch<{ liked: boolean }>(`/posts/${postId}/likes`, {
     method: "POST",
@@ -29,4 +44,19 @@ export function createComment(postId: string, input: CreateCommentInput) {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function getNotifications() {
+  return apiFetch<NotificationsResponse>("/posts/notifications");
+}
+
+export function markNotificationsRead(body: { keys?: string[]; all?: boolean }) {
+  return apiFetch<{ marked: number }>("/posts/notifications/read", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function getPostsByUser(userId: string) {
+  return apiFetch<Post[]>(`/posts/by-user/${encodeURIComponent(userId)}`);
 }

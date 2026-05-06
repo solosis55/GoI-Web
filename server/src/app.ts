@@ -8,6 +8,7 @@ import rateLimit from "express-rate-limit";
 import authRoutes from "./routes/authRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import postsRoutes from "./routes/postsRoutes.js";
+import storiesRoutes from "./routes/storiesRoutes.js";
 import exercisesRoutes from "./routes/exercisesRoutes.js";
 import workoutSessionsRoutes from "./routes/workoutSessionsRoutes.js";
 import workoutsRoutes from "./routes/workoutsRoutes.js";
@@ -30,11 +31,13 @@ const serveProductionClient =
   process.env.NODE_ENV === "production" && existsSync(join(clientDist, "index.html"));
 
 app.use(cors());
-app.use(express.json());
+/** Historías y posts con fotos en base64; el límite por defecto (100 KB) corta payloads válidos. */
+app.use(express.json({ limit: "18mb" }));
 
+const isTestEnv = process.env.VITEST === "true" || process.env.NODE_ENV === "test";
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: isTestEnv ? 10_000 : 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -54,6 +57,7 @@ if (!serveProductionClient) {
         exercises: "/api/exercises",
         workoutSessions: "/api/workout-sessions",
         posts: "/api/posts",
+        stories: "/api/stories",
       },
     });
   });
@@ -69,6 +73,7 @@ app.use("/api/workouts", workoutsRoutes);
 app.use("/api/exercises", exercisesRoutes);
 app.use("/api/workout-sessions", workoutSessionsRoutes);
 app.use("/api/posts", postsRoutes);
+app.use("/api/stories", storiesRoutes);
 
 if (serveProductionClient) {
   app.use(express.static(clientDist, { index: false }));

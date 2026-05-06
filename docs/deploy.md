@@ -29,6 +29,8 @@ Consulta `server/.env.example` para variables adicionales opcionales (`AUTH_RESE
 
 Los datos viven en **`server/data/store.json`** (o en la ruta definida por **`FITSOCIAL_STORE_PATH`**). En contenedores/PaaS sin **volumen persistente**, el fichero se pierde al redesplegar o recrear la instancia.
 
+- **Demo / desarrollo**: para recrear las cuatro cuentas `*@test.com` existe **`npm run seed:demo-users`** (solo si falta el email) y **`npm run reset:demo-users`** (**upsert** + password `123456` según `server/src/data/demoUsers.ts`), desde la **raiz del repo** o `server/` (ver **`README.md`**). Los scripts solo escriben disco en **fuera de test**: tras ejecutarlos, **reinicia el proceso del API** para que vuelva a leer el JSON (`GET /api/health` muestra **`devStore.usersLoaded`**).
+- **`FITSOCIAL_STORE_PATH`**: si la defines, debe apuntar a un archivo JSON válido **o estar sin definir**: un fichero vacío o incompleto hace fallar **`JSON.parse`** al arrancar. Usa seeds sobre la misma ruta que usará runtime.
 - **MVP**: aceptable para pruebas.
 - **Vercel (serverless)**: con `VERCEL=1` el store por defecto se escribe en **`/tmp/fitsocial-store.json`** (copia inicial desde `server/data/store.json` del despliegue). Los datos **no** son duraderos entre instancias ni equivalentes a un disco persistente; sirve para demos. Producción seria: base de datos o almacen gestionado.
 - **Siguiente paso**: volumen Docker, disco persistente en el proveedor, o base de datos.

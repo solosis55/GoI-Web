@@ -22,6 +22,7 @@ describe("workout sessions API", () => {
     store.likes = [];
     store.comments = [];
     store.follows = [];
+    store.storyReels = [];
   });
 
   it("rejects listing sessions without token", async () => {

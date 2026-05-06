@@ -2,12 +2,14 @@
 
 ## 0) Marca GoI y tokens CSS
 
-- **Asset:** `public/branding/goi-logo.png` (sidebar en `App.tsx` via `GoISidebarBadge`).
+- **Asset:** `public/branding/goi-logo.png` (pantalla **auth** centrada via `GoISidebarBadge`; con sesión, sidebar usa foto de perfil via `SidebarSessionBadge`).
 - **Paleta (Tailwind v4 `@theme` en `src/index.css`):**
   - `goi-gold` / `goi-gold-dim` — acento tipo oro del logotipo (CTA primaria, pestaña activa, anillos de foco, historias).
   - `goi-steel` — acero / metal para rótulo “FitSocial”, cuerpo de texto secundario en tarjetas oscuras y campos `.goi-field`.
 - **Shell:** fondo `bg-black` y borde `neutral-900` en lateral; zona de contenido con cards **zinc / negro** y acentos dorados (feed, entrenos, perfil, auth). Contenedor raiz **`flex min-h-screen flex-col`**: `main.social-shell` crece (`flex-1`) y **`SiteFooter`** queda a ancho completo bajo la rejilla (sesion y auth).
-- **Logo en sidebar (`GoISidebarBadge`):** contenedor **circular** (`rounded-full`) con fondo `neutral-950`, anillo dorado suave y sombra; imagen **más pequeña** que el PNG original, centrada con `justify-items-center` en el bloque de marca; textos FitSocial / subtítulo centrados en el ancho del lateral.
+- **Marca GoI en login (`GoISidebarBadge`):** círculo con logo contenido (`object-contain`), anillo oro suave y textos centrados sobre fondo negro del `main`.
+- **Marca con sesión (`SidebarSessionBadge`):** mismo tamaño de aro (**~112px / ~88px** móvil); **imagen del usuario** a **cubierta** (`Avatar` `fill`); rótulo FitSocial y **`@usuario`** debajo.
+- **Nav lateral autenticada (`SidebarNavigation`):** enlaces **Inicio / Rutinas / Perfil** y **Cerrar sesión** con **iconos SVG** alineados a la izquierda (`Button` `secondary`, `navActive` o `danger`). Hover y estado activo con transiciones **`motion-safe:`** (traslación ligera, escala del icono, pulsación); con **`prefers-reduced-motion: reduce`** Tailwind omite esas utilidades y el bloque global de `index.css` acorta el resto. `<nav aria-label="Navegación principal">`; iconos **`aria-hidden`**. En móvil, **Cerrar sesión** ocupa anchura completa (`col-span-2` en rejilla compacta).
 - **Clase `.goi-field` (`@layer components` en `index.css`):** inputs sobre paneles oscuros — borde neutro, fondo negro, texto `goi-steel`, foco con borde y anillo **oro** (feed, crear post, comentarios, workouts, perfil, auth).
 - **Componentes UI:** `Card` con `tone="dark"` o default (ambos tonos son paneles oscuros con viñeta interior dorada sutil); `Button` `primary` = oro (alineado con `navActive`), `secondary` = píldora clara para contraste sobre negro.
 - **Pulido global (mismo `index.css`):**
@@ -20,8 +22,10 @@
 ## 1) Estructura de componentes principales
 
 ### Frontend (`src`)
-- `App.tsx`: shell principal (`div` flex columna + `main.social-shell`), control de sesion y navegacion por tabs (`feed`, `workouts`, `profile`). En **Rutinas**, subvistas internas sin router URL: `workoutsView` = `overview` | `editor` | `catalog` | `exerciseDetail`. Cambiar a Inicio/Perfil **no** resetea la subvista de rutinas (se conserva editor/catalogo/ficha al volver a la pestaña). Estado auxiliar: `catalogFromEditor`, `exerciseDetailFromEditor`, `catalogExerciseId`, modo del editor (`WorkoutEditorMode`). Persistencia de pestaña activa: `sessionStorage` `fitsocial:activeTab`. Borrador crear rutina: ver `workoutCreateDraft` en seccion cliente. Sidebar con logotipo GoI; **`SiteFooter`** en invitado y logueado.
-- `components/branding/GoISidebarBadge.tsx`: imagen de marca + rótulo FitSocial + subtítulo (login o `@usuario`).
+- `App.tsx`: shell principal (`div` flex columna + `main.social-shell`), control de sesion y navegacion por tabs (`feed`, `workouts`, `profile`). En **Rutinas**, subvistas internas sin router URL: `workoutsView` = `overview` | `editor` | `catalog` | `exerciseDetail`. Cambiar a Inicio/Perfil **no** resetea la subvista de rutinas (se conserva editor/catalogo/ficha al volver a la pestaña). Estado auxiliar: `catalogFromEditor`, `exerciseDetailFromEditor`, `catalogExerciseId`, modo del editor (`WorkoutEditorMode`). Persistencia de pestaña activa: `sessionStorage` `fitsocial:activeTab`. Borrador crear rutina: ver `workoutCreateDraft` en seccion cliente. Auth **sin sidebar** (marca GoI centrada arriba del formulario); logueado sidebar con **foto de perfil** (`SidebarSessionBadge`) y **`SidebarNavigation`** (iconos + handlers de pestaña y logout). **`SiteFooter`** en ambos.
+- `components/branding/GoISidebarBadge.tsx`: logo GoI + FitSocial + subtítulo (auth).
+- `components/branding/SidebarSessionBadge.tsx`: avatar del usuario en el lateral + FitSocial + `@usuario`.
+- `components/layout/SidebarNavigation.tsx`: pestañas principal con iconos (`feed`/`workouts`/`profile`), **Cerrar sesión**, accesibilidad y animaciones **`motion-safe`**.
 - `components/layout/SiteFooter.tsx`: pie global — copyright dinámico, texto MVP, enlace **Roadmap** (Trello del README), placeholders Aviso legal / Privacidad / Contacto (`title` “Página en preparación”).
 - `context/AuthContext.tsx`: estado global de autenticacion (token, user, login/logout, persistencia local).
 - `pages/AuthPage.tsx`: registro, inicio de sesion, solicitud de recuperacion de contraseña y pantalla de nueva contraseña (`?reset=token`); card **`tone="dark"`**, campos **`.goi-field`**, `StatusMessage` con **`tone="dark"`**.
@@ -31,7 +35,7 @@
 - `pages/ExerciseCatalogPage.tsx`: listado filtrable del catalogo de ejercicios; enlaces a ficha; seleccion para llevar ejercicios al editor. **Miga de pan (desde editor):** `Rutinas` / `Editor de rutinas` / `Nueva rutina`|`Editar rutina` (`routineFormCrumb`) / pill **Catalogo**. Sin editor: `Rutinas` / **Catalogo**.
 - `pages/ExerciseDetailPage.tsx`: ficha de un ejercicio (`GET /api/exercises/:id`). **Miga de pan:** flujo completo `Rutinas` → `Editor de rutinas` → formulario → `Catalogo` → nombre; rotulo **Ficha del ejercicio**.
 - `pages/ProfilePage.tsx`: ver/editar perfil deportivo; bloque **Entrenamientos registrados** (`WorkoutSessionsHistory`, solo lectura, datos de `GET /api/workout-sessions`).
-- `api/*.ts`: cliente HTTP y funciones por dominio (`authApi`, `postsApi`, `workoutsApi`).
+- `api/*.ts`: cliente HTTP y funciones por dominio (`authApi`, `postsApi`, `storiesApi`, `workoutsApi`).
 - `types/*.ts`: contratos TypeScript del cliente.
 
 ### Backend (`server/src`)
@@ -43,7 +47,7 @@
 
 Utilidades frontend relacionadas con rutinas:
 - `src/utils/workoutCreateDraft.ts` — leer/escribir/limpiar borrador de creacion en `sessionStorage`.
-- `src/utils/errorMessages.ts` — incluye codigos del catalogo (p. ej. ejercicio no encontrado) ademas de auth/posts/workouts.
+- `src/utils/errorMessages.ts` — incluye codigos del catalogo (p. ej. ejercicio no encontrado) ademas de auth/posts/workouts/stories (**`AUTH_SESSION_STALE`**, `STORY_INVALID_SLIDES`, etc.).
 
 ## 2) Componentes reutilizables (decision)
 
@@ -58,6 +62,7 @@ Componentes reutilizables ya implementados:
 - `components/ui/Avatar.tsx`
 - `components/ui/EmptyState.tsx`
 - `components/layout/SiteFooter.tsx`
+- `components/layout/SidebarNavigation.tsx`
 - `components/feed/PostItem.tsx`
 - `components/feed/CommentList.tsx`
 - `components/feed/PostComposer.tsx`
@@ -105,6 +110,7 @@ Recursos:
 - `workouts`
 - `exercises` (catalogo)
 - `posts`
+- `stories` (reels de imagenes, JWT)
 - `health`
 
 ### Auth (`/api/auth`)
@@ -184,6 +190,19 @@ Registro de que el usuario realizo una **plantilla** (`workoutId`) en un instant
   - body: `{ userId, content }`
   - 201: `Comment`
 
+Escritura con JWT cuyo **`userId` no existe** en el store (sesion «huérfana» tras reinicio de datos): **`401`** + codigo **`AUTH_SESSION_STALE`** en creacion de post, like y comentario (ademas de historias; ver abajo). El cliente fuerza cierre de sesion vía `auth:expired`.
+
+### Historias / reels (`/api/stories`, JWT obligatorio)
+
+Carrete activo ~**24 h** por creacion en servidor; listado limitado a **tu usuario** y **personas a las que sigues**. Slides son **imagenes** (Data URL) con limites de tamano/tipo alineados a `postMedia` (validacion en `parseStorySlidesFromRequest`).
+
+- `GET /`
+  - 200: `{ authors: FeedStoryAuthor[] }` (agregado por usuario: `userId`, `authorUsername`, `authorAvatarUrl`, `slides[]` con `reelId` por slide).
+- `POST /`
+  - body: `{ slides: SlideInput[] }` (1–15 imagenes jpeg/png/webp como Data URL segun validaciones del servidor).
+  - 201: `{ reel: { id, userId, slides, createdAt, expiresAt } }`
+  - Errores comunes: `400` **`STORY_INVALID_SLIDES`**, `401` sin usuario en store (**`AUTH_SESSION_STALE`**), `401` token ausente/incorrecto (middleware).
+
 ### Health (`/api/health`)
 - `GET /`
   - 200: estado del servicio
@@ -191,12 +210,13 @@ Registro de que el usuario realizo una **plantilla** (`workoutId`) en un instant
 ## 5) Persistencia: servidor vs cliente
 
 Servidor (persistido en `server/data/store.json`, o ruta `FITSOCIAL_STORE_PATH`; en **Vercel** serverless el valor por defecto es un JSON en **`/tmp`** copiado del seed del repo — ver `docs/deploy.md`):
-- `users` (incluye campos opcionales internos `passwordResetTokenHash` y `passwordResetExpires` mientras un reset este pendiente; no se exponen en respuestas `user` publicas), `workouts` (**`exerciseIds`** hacia el catalogo), **`exercises`** (catalogo global), **`workoutSessions`**, `posts`, `likes`, `comments`, `follows`.
+- `users` (incluye campos opcionales internos `passwordResetTokenHash` y `passwordResetExpires` mientras un reset este pendiente; no se exponen en respuestas `user` publicas), `workouts` (**`exerciseIds`** hacia el catalogo), **`exercises`** (catalogo global), **`workoutSessions`**, `posts`, `likes`, `comments`, `follows`, **`storyReels`** (reels de historias con `slides` y `expiresAt`).
 - Fuente de verdad de negocio.
 
 Cliente (persistencia local):
 - Sesion autenticada (`token`, `user`) en `localStorage`.
 - Pestaña activa (`fitsocial:activeTab`) y borrador **crear rutina** (`fitsocial:workoutCreateDraft` en `sessionStorage`: titulo, descripcion, `exerciseIds`, lineas de etiquetas) — utilidad `src/utils/workoutCreateDraft.ts`.
+- Historias «vistas» por usuario: mapa en `localStorage` (`src/utils/storySeen.ts`) para el anillo de **no visto** en `StoriesRow` (complementario al TTL del servidor).
 - Resto del estado de pantalla se recalcula desde API cuando aplica.
 
 Decision:
@@ -234,5 +254,5 @@ Flujo tipico:
 - Opcional: extraer sidebar completo del feed.
 - Mantener convención Tailwind-first para nuevos componentes y reducir CSS legacy a `src/index.css` únicamente.
 - Tras cada iteración relevante, actualizar documentación en **`README.md`**, **`docs/project-management.md`**, **`docs/design.md`**, **`docs/components.md`** y **`src/pages/README.md`** (convención descrita en project-management).
-- Anadir diagrama de entidades (Users, Posts, Workouts, Likes, Comments, Follows).
+- Anadir diagrama de entidades (Users, Posts, Workouts, Likes, Comments, Follows, StoryReels).
 - Preparar plan de migracion de `store.json` a PostgreSQL.

@@ -15,7 +15,8 @@ Cualquier cambio relevante de **producto, UX, API, despliegue o convenciones de 
 ## Estado
 - Fecha de inicio: 2026-04-27
 - Fase actual: Cierre del MVP y estandarizacion de UI con Tailwind
-- Ultimo refinamiento UX + marca: shell **negro**, marca **GoI** (logo circular centrado en sidebar, tokens **oro/acero**), paneles **zinc** con acentos dorados, formularios con **`.goi-field`**, pulido global (**seleccion de texto**, **scrollbars** oscuros, **`prefers-reduced-motion`**, **focus-visible** en enlaces y botones). **Inicio**: encabezado de pagina, feed a ancho util, historias compactas. **Rutinas**: dashboard con resumen + calendario + lista, editor dedicado y breadcrumb visual; sin bloque de registro/historial en esa pestaña para reducir saturacion. **Pie** global `SiteFooter`.
+- Ultimo refinamiento UX + marca: shell **negro**, marca **GoI** (logo circular centrado en sidebar, tokens **oro/acero**), paneles **zinc** con acentos dorados, formularios con **`.goi-field`**, pulido global (**seleccion de texto**, **scrollbars** oscuros, **`prefers-reduced-motion`**, **focus-visible** en enlaces y botones). **Inicio**: encabezado de pagina, feed a ancho util, historias compactas (**reels de imagenes** caducadas en servidor tras ~24 h, visibilidad tipo seguidos + tu propio carrete). **Rutinas**: dashboard con resumen + calendario + lista, editor dedicado y breadcrumb visual; sin bloque de registro/historial en esa pestaña para reducir saturacion. **Pie** global `SiteFooter`.
+- Operativa desarrollo (**store JSON + JWT local**): si se reinicia o sustituye `store.json` y el navegador conserva JWT, pueden aparecer acciones escritoras fallidas hasta volver a iniciar sesion; el backend usa `401` + **`AUTH_SESSION_STALE`** en ese caso y el cliente fuerza **`auth:expired`**. Para cuentas `*@test.com` reproducibles existe **`npm run seed:demo-users`** (solo emails nuevos) y **`npm run reset:demo-users`** (upsert de las cuatro cuentas y password `123456` segun `demoUsers.ts`; ver **`README.md`**).
 
 ## Recomendaciones MVP
 
@@ -25,10 +26,11 @@ Cualquier cambio relevante de **producto, UX, API, despliegue o convenciones de 
 - [x] Perfil deportivo basico (foto, bio, objetivo).
 - [x] Interacciones minimas (likes y comentarios).
 - [x] Historial de entrenamientos para progreso semanal.
+- [x] Historias / reels de imagenes (API `/api/stories`, visibilidad a seguidores + usuario actual, TTL ~24 h).
 
 ### Funcionalidades recomendadas para dejar fuera (Fase 2)
 - [ ] Chat en tiempo real.
-- [ ] Stories o videos cortos.
+- [ ] Historias con video edicion tipo «stories» avanzadas (el MVP usa imagenes Data URL segun limites del servidor).
 - [ ] Sistema avanzado de notificaciones.
 - [ ] Recomendaciones con IA.
 
@@ -89,6 +91,8 @@ Ubicacion: `server/src/__tests__/`. Se ejecutan con Vitest y peticiones HTTP via
 | Like o comentario sin token (post existente) | `401`, codigo `AUTH_HEADER_INVALID`. |
 | Borrar publicacion de otro usuario (token de intruso) | `403`, codigo `POST_FORBIDDEN`. |
 
+Sesion JWT valida pero **usuario borrado del store en memoria** (no cubierta por estos tests pero contrato estable): escritura que exige usuario existente (p. ej. crear post, like, comentar, crear historia) debe responder **`401`** con codigo **`AUTH_SESSION_STALE`** para distinguir sesion huérfana tras reset de datos o proceso desalineado; el cliente debe cerrar sesion y pedir login de nuevo.
+
 ### `auth-workouts.test.ts` (auth + entrenamientos + perfil)
 
 | Escenario | Comportamiento esperado |
@@ -108,7 +112,7 @@ Ubicacion: `server/src/__tests__/`. Se ejecutan con Vitest y peticiones HTTP via
 | Crear sesion con entreno ajeno | `403`, codigo `WORKOUT_FORBIDDEN`. |
 | Borrar sesion de otro usuario | `403`, codigo `WORKOUT_SESSION_FORBIDDEN`. |
 
-Nota: `auth-workouts.test.ts` guarda y restaura `data/store.json` en `beforeAll` / `afterAll` para no dejar el fichero de persistencia modificado tras la suite.
+Nota: `auth-workouts.test.ts` aisla estado en **memoria** (`beforeEach`); **`saveStore()` no escribe disco** con Vitest activo, así que el JSON real del repo ya no se restaura después de la suite (evitar sobrescribir cuentas demo u otros datos tras `npm run reset:demo-users`).
 
 ## Mensajes de error (frontend)
 
@@ -116,6 +120,7 @@ Se centralizaron textos amigables para el usuario en `src/utils/errorMessages.ts
 
 Actualizacion reciente:
 - Se ampliaron los codigos soportados en `errorMessages` (`AUTH_REGISTER_INVALID_INPUT`, `AUTH_LOGIN_INVALID_INPUT`, `AUTH_PROFILE_INVALID_INPUT`, `AUTH_RATE_LIMITED`, `POST_INVALID_INPUT`, `COMMENT_INVALID_INPUT`, `WORKOUT_INVALID_INPUT`, entre otros).
+- **`AUTH_SESSION_STALE`**: mensaje orientado a reinicio de datos / otro entorno; el cliente HTTP lo trata como expiracion de sesion (mismo camino que token invalido en `src/api/client.ts`) para volver a login sin quedarse en errores opacos en modales (historias, posts, etc.).
 - En `AuthPage`, cuando llega `AUTH_RATE_LIMITED`, se muestra un mensaje especifico y se bloquea temporalmente el boton de envio para evitar reintentos inmediatos.
 - Codigos de recuperacion de contraseña: `AUTH_FORGOT_PASSWORD_INVALID_INPUT`, `AUTH_RESET_INVALID_INPUT`, `AUTH_RESET_TOKEN_INVALID`.
 
@@ -123,7 +128,7 @@ Actualizacion reciente:
 
 ### Seguridad de autenticacion
 - Se anadio rate limit para `POST /api/auth/login` y `POST /api/auth/register` con `express-rate-limit` (ventana 15 min, max 20 intentos, codigo `AUTH_RATE_LIMITED`).
-- Se implemento logout global en frontend cuando la API responde token invalido/caducado (`AUTH_TOKEN_INVALID`, `AUTH_UNAUTHORIZED` o `401`) usando evento `AUTH_EXPIRED_EVENT` desde `src/api/client.ts` y listener en `AuthContext`.
+- Se implemento logout global en frontend cuando `apiFetch` recibe fallo HTTP y **`shouldExpireSession`** aplica (`401` siempre incluido para errores HTTP, mas confirmacion explicita si el cuerpo trae **`AUTH_UNAUTHORIZED`**, **`AUTH_TOKEN_INVALID`** o **`AUTH_SESSION_STALE`**): se emite `AUTH_EXPIRED_EVENT` desde `src/api/client.ts` y `AuthContext` limpia almacenamiento. **`AUTH_SESSION_STALE`** alinea UX cuando el JWT sigue valido pero el usuario ya no esta en disco (tras reset de **`store.json`** u otro desajuste).
 - Se reforzo `JWT_SECRET`: en produccion es obligatorio definirlo; solo fuera de produccion se usa el secreto por defecto.
 
 ### Normalizacion y validacion consistente de input (backend)
@@ -218,6 +223,17 @@ Actualizacion reciente:
     - **Documentacion** sincronizada: `README.md`, `docs/design.md`, `docs/components.md`, `src/pages/README.md`, esta entrada.
 
 72. **Detalle por ejercicio en catalogo:** modelo `Exercise` ampliado con `equipment`, `description`, `instructions` (backend `store.ts` + semilla `server/src/data/exerciseDetails.ts`). Fusion en `mergeExerciseCatalog`; UI: lista del catalogo muestra resumen (`line-clamp-2`); ficha (`ExerciseDetailPage`) muestra equipamiento, ejecucion multilinea y grupos musculares. Tests `exercises.test.ts` comprueban respuesta con texto.
+
+73. **Historias (reels) + sesiones consistentes.** Persistencia **`storyReels`** en store; API **`GET|POST /api/stories`** (JWT); caducidad en servidor (~24 h). Cliente `storiesApi`, componentes **`StoriesRow`**, **`CreateStoryModal`**, **`StoryViewerModal`**; uso de `storySeen` en `localStorage` para anillo «no visto». Escrituras con JWT cuyo `userId` no existe en store (dato reiniciado, token viejo): **`401` + `AUTH_SESSION_STALE`** en posts/historias; mensaje user-facing en `errorMessages`; expiracion forzada en `api/client.ts`. Scripts demo: **`server/scripts/reset-demo-users.ts`** + comando **`npm run reset:demo-users`** (desde **`server/`** o raiz via `npm run reset:demo-users`), upsert de `DEMO_USERS` con password `123456`; **`seed-demo-users`** sigue siendo «solo si falta email». Documentacion en **`README.md`**, **`docs/design.md`**, **`docs/deploy.md`** (operativa reload del API tras tocar disco).
+
+## Usuarios demo y fichero JSON (operativa rapida)
+
+| Objetivo | Comando |
+|----------|---------|
+| Crear demo solo cuando el email **no** exista | `npm run seed:demo-users` (raiz) o dentro de **`server/`** |
+| Dejar demo en estado conocido (**upsert**, resetea passwords a **`123456`**) | `npm run reset:demo-users` (raiz) o dentro de **`server/`** |
+
+Tras modificar **`server/data/store.json`** (seed, reset o editor), **reinicia el proceso del API**: el servidor lee el JSON al arrancar. Confirma con **`GET /api/health`** (`devStore.usersLoaded`). Si **`FITSOCIAL_STORE_PATH`** apunta a otro archivo, el seed usa esa misma ruta al ejecutarse desde el mismo proceso de Node (y el API en marcha debe apuntar al mismo fichero para evitar sorpresas).
 
 ## Recuperacion de contraseña (resumen operativo)
 

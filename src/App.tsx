@@ -1,8 +1,9 @@
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GoISidebarBadge } from "./components/branding/GoISidebarBadge";
+import { SidebarSessionBadge } from "./components/branding/SidebarSessionBadge";
 import { SiteFooter } from "./components/layout/SiteFooter";
-import { Button } from "./components/ui/Button";
+import { SidebarNavigation } from "./components/layout/SidebarNavigation";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AuthPage } from "./pages/AuthPage";
 import { FeedPage } from "./pages/FeedPage";
@@ -36,6 +37,19 @@ function persistActiveTab(tab: ActiveTab) {
   }
 }
 
+/** Quita `post` del query para no dejar enlaces pegados después del scroll en el feed. */
+function stripPostQueryFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("post")) return;
+    url.searchParams.delete("post");
+    const q = url.searchParams.toString();
+    window.history.replaceState(null, "", `${url.pathname}${q ? `?${q}` : ""}${url.hash}`);
+  } catch {
+    /* ignore */
+  }
+}
+
 function AppContent() {
   const { isAuthenticated, logout, user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => readStoredTab() ?? "feed");
@@ -48,6 +62,46 @@ function AppContent() {
 
   const routineFormBreadcrumbLabel =
     workoutEditorMode.mode === "edit" ? "Editar rutina" : "Nueva rutina";
+  /** Desde Perfil: abrir Inicio y centrar esa publicación en el timeline (ids de `Mis publicaciones`). */
+  const [feedFocusPostId, setFeedFocusPostId] = useState<string | null>(null);
+
+  const goTo = useCallback((tab: ActiveTab) => {
+    persistActiveTab(tab);
+    setActiveTab(tab);
+  }, []);
+
+  const clearFeedFocus = useCallback(() => {
+    stripPostQueryFromUrl();
+    setFeedFocusPostId(null);
+  }, []);
+
+  const navigateToFeedPost = useCallback(
+    (postId: string) => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("post", postId);
+        const q = url.searchParams.toString();
+        window.history.replaceState(null, "", `${url.pathname}${q ? `?${q}` : ""}${url.hash}`);
+      } catch {
+        /* ignore */
+      }
+      setFeedFocusPostId(postId);
+      goTo("feed");
+    },
+    [goTo],
+  );
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    try {
+      const postId = new URLSearchParams(window.location.search).get("post")?.trim();
+      if (!postId) return;
+      setFeedFocusPostId(postId);
+      goTo("feed");
+    } catch {
+      /* ignore */
+    }
+  }, [isAuthenticated, goTo]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -65,24 +119,20 @@ function AppContent() {
     }
   }, [isAuthenticated]);
 
-  function goTo(tab: ActiveTab) {
-    persistActiveTab(tab);
-    setActiveTab(tab);
-  }
-
   if (!isAuthenticated) {
     return (
       <div className="flex min-h-screen flex-col bg-black text-neutral-200">
-        <main className="social-shell grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
-          <aside className="social-sidebar sticky top-0 flex h-screen flex-col gap-5 border-r border-neutral-900 bg-black px-3.5 py-6 max-md:static max-md:h-auto max-md:border-b max-md:border-r-0 max-md:px-2.5 max-md:py-3">
+        <main className="social-shell flex min-h-0 flex-1 flex-col items-center px-4 py-10 sm:py-14">
+          <div className="mb-8 flex w-full flex-col items-center sm:mb-10">
             <GoISidebarBadge
               subtitle="Inicia sesión o regístrate"
               description="Red social y rutinas en un solo lugar. Entra al feed cuando inicies sesión."
+              showDescriptionOnMobile
             />
-          </aside>
-          <section className="social-content flex min-h-0 min-w-0 w-full flex-col justify-center p-4 max-md:min-h-[50vh] max-md:py-6 max-md:max-lg:justify-start">
+          </div>
+          <div className="flex w-full min-w-0 flex-1 flex-col justify-center pb-8">
             <AuthPage />
-          </section>
+          </div>
         </main>
         <SiteFooter />
       </div>
@@ -93,39 +143,20 @@ function AppContent() {
     <div className="flex min-h-screen flex-col bg-black text-neutral-200">
       <main className="social-shell grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="social-sidebar sticky top-0 flex h-screen flex-col gap-5 border-r border-neutral-900 bg-black px-3.5 py-6 max-md:static max-md:h-auto max-md:border-b max-md:border-r-0 max-md:px-2.5 max-md:py-3">
-          <GoISidebarBadge subtitle={`@${user?.username ?? ""}`} />
-          <nav className="sidebar-nav grid gap-2.5 max-md:grid-cols-2">
-            <Button
-              type="button"
-              variant={activeTab === "feed" ? "navActive" : "secondary"}
-              onClick={() => goTo("feed")}
-            >
-              Inicio
-            </Button>
-            <Button
-              type="button"
-              variant={activeTab === "workouts" ? "navActive" : "secondary"}
-              onClick={() => {
-                setWorkoutsView("overview");
-                setCatalogExerciseId(null);
-                setCatalogFromEditor(false);
-                setExerciseDetailFromEditor(false);
-                goTo("workouts");
-              }}
-            >
-              Rutinas
-            </Button>
-            <Button
-              type="button"
-              variant={activeTab === "profile" ? "navActive" : "secondary"}
-              onClick={() => goTo("profile")}
-            >
-              Perfil
-            </Button>
-            <Button type="button" variant="danger" className="sidebar-logout mt-4" onClick={logout}>
-              Cerrar sesion
-            </Button>
-          </nav>
+          <SidebarSessionBadge username={user?.username ?? ""} avatarUrl={user?.avatarUrl ?? ""} />
+          <SidebarNavigation
+            activeTab={activeTab}
+            onFeed={() => goTo("feed")}
+            onWorkouts={() => {
+              setWorkoutsView("overview");
+              setCatalogExerciseId(null);
+              setCatalogFromEditor(false);
+              setExerciseDetailFromEditor(false);
+              goTo("workouts");
+            }}
+            onProfile={() => goTo("profile")}
+            onLogout={logout}
+          />
         </aside>
 
         <section className="social-content min-h-0 min-w-0 w-full p-4 max-md:p-2.5">
@@ -220,8 +251,10 @@ function AppContent() {
               }}
             />
           )}
-          {activeTab === "profile" && <ProfilePage />}
-          {activeTab === "feed" && <FeedPage />}
+          {activeTab === "profile" && <ProfilePage onOpenPostInFeed={navigateToFeedPost} />}
+          {activeTab === "feed" && (
+            <FeedPage focusPostId={feedFocusPostId} onFocusPostHandled={clearFeedFocus} />
+          )}
         </section>
       </main>
       <SiteFooter />

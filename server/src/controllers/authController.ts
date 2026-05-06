@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { createId, saveStore, store, User } from "../services/store.js";
 import { hashPassword, signAuthToken, verifyPassword } from "../services/auth.js";
 import { sendError } from "../services/http.js";
+import { isValidProfileAvatarUrlCandidate } from "../services/postMedia.js";
 import { isLengthBetween, normalizeEmail, sanitizeText } from "../services/validation.js";
 
 type AuthPayload = {
@@ -26,6 +27,15 @@ function sanitizeUser(user: User) {
   delete (safeUser as Partial<User>).passwordResetTokenHash;
   delete (safeUser as Partial<User>).passwordResetExpires;
   return safeUser;
+}
+
+/** Sin email cuando el observador no es el propio usuario. */
+function sanitizeUserForViewer(user: User, viewerUserId: string) {
+  const safe = sanitizeUser(user);
+  if (viewerUserId === user.id) return safe;
+  const publicFields = { ...safe };
+  delete (publicFields as { email?: string }).email;
+  return publicFields;
 }
 
 function hashResetToken(token: string) {
@@ -164,6 +174,12 @@ export async function login(req: Request, res: Response) {
 }
 
 export function getProfile(req: Request, res: Response) {
+  const authUserId = String(res.locals.authUserId ?? "");
+  if (!authUserId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+
   const { userId } = req.params;
   const user = store.users.find((item) => item.id === userId);
 
@@ -173,7 +189,7 @@ export function getProfile(req: Request, res: Response) {
   }
 
   res.json({
-    user: sanitizeUser(user),
+    user: sanitizeUserForViewer(user, authUserId),
   });
 }
 
@@ -221,8 +237,13 @@ export function updateProfile(req: Request, res: Response) {
 
   if (avatarUrl !== undefined) {
     const normalizedAvatarUrl = sanitizeText(avatarUrl);
-    if (normalizedAvatarUrl && !/^https?:\/\//i.test(normalizedAvatarUrl)) {
-      sendError(res, 400, "AUTH_PROFILE_INVALID_INPUT", "avatar must start with http:// or https://");
+    if (normalizedAvatarUrl && !isValidProfileAvatarUrlCandidate(normalizedAvatarUrl)) {
+      sendError(
+        res,
+        400,
+        "AUTH_PROFILE_INVALID_INPUT",
+        "avatar must be http(s) URL or image data URL (jpeg/png/webp)",
+      );
       return;
     }
     user.avatarUrl = normalizedAvatarUrl;
@@ -249,7 +270,7 @@ export function listUsers(req: Request, res: Response) {
         (follow) => follow.followerId === currentUserId && follow.followingId === user.id
       );
       return {
-        ...sanitizeUser(user),
+        ...sanitizeUserForViewer(user, currentUserId),
         isFollowing,
       };
     });

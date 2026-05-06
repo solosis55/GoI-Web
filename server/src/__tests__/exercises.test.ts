@@ -35,6 +35,7 @@ describe("exercises API", () => {
     store.likes = [];
     store.comments = [];
     store.follows = [];
+    store.storyReels = [];
   });
 
   it("rejects GET exercise without token", async () => {

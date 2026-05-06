@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EXERCISE_DETAILS_BY_ID } from "../data/exerciseDetails.js";
 import { DEFAULT_EXERCISE_SEED } from "../data/defaultExercises.js";
+import { sanitizePersistedMedia } from "./postMedia.js";
 import { sanitizeText, sanitizeWorkoutTags } from "./validation.js";
 import {
   blocksFromExerciseIdsOnly,
@@ -75,7 +76,10 @@ export type Post = {
   id: string;
   userId: string;
   content: string;
+  /** Imágenes en data URL (`data:image/jpeg;base64,...`). */
+  media?: { type: "image"; url: string }[];
   workoutId: string | null;
+  visibility: "public" | "followers" | "private";
   createdAt: string;
   updatedAt: string;
 };
@@ -103,6 +107,28 @@ export type Follow = {
   createdAt: string;
 };
 
+/** Diapositiva dentro de una historia (caduca con el reel). */
+export type StorySlide = {
+  id: string;
+  mediaUrl: string;
+};
+
+/** Un envío de historia; caduca a las ~24 h de `createdAt`. */
+export type StoryReel = {
+  id: string;
+  userId: string;
+  slides: StorySlide[];
+  createdAt: string;
+  expiresAt: string;
+};
+
+/** Marca notificaciones del feed como vistas (por usuario receptor). */
+export type NotificationReadRecord = {
+  userId: string;
+  key: string;
+  readAt: string;
+};
+
 export const store = {
   users: [] as User[],
   exercises: [] as Exercise[],
@@ -112,6 +138,8 @@ export const store = {
   likes: [] as Like[],
   comments: [] as Comment[],
   follows: [] as Follow[],
+  notificationReads: [] as NotificationReadRecord[],
+  storyReels: [] as StoryReel[],
 };
 
 const currentFile = fileURLToPath(import.meta.url);
@@ -129,6 +157,11 @@ function getDataFilePath(): string {
   return defaultRepoStorePath;
 }
 
+/** Ruta del JSON que usa el proceso (útil en `/api/health` en desarrollo). */
+export function getPersistedStorePath() {
+  return getDataFilePath();
+}
+
 export function createId() {
   return randomUUID();
 }
@@ -142,6 +175,8 @@ type PersistedStore = {
   likes: Like[];
   comments: Comment[];
   follows: Follow[];
+  notificationReads?: NotificationReadRecord[];
+  storyReels?: StoryReel[];
 };
 
 const EXERCISE_EQUIPMENT_MAX = 160;
@@ -331,10 +366,65 @@ export function initializeStore() {
     : [];
 
   store.workoutSessions = Array.isArray(parsed.workoutSessions) ? parsed.workoutSessions : [];
-  store.posts = Array.isArray(parsed.posts) ? parsed.posts : [];
+  store.notificationReads = Array.isArray(parsed.notificationReads)
+    ? parsed.notificationReads
+        .filter(
+          (r): r is NotificationReadRecord =>
+            Boolean(r && typeof r === "object" && typeof (r as NotificationReadRecord).userId === "string"),
+        )
+        .map((r) => ({
+          userId: String((r as NotificationReadRecord).userId ?? ""),
+          key: String((r as NotificationReadRecord).key ?? ""),
+          readAt: String((r as NotificationReadRecord).readAt ?? ""),
+        }))
+        .filter((r) => r.userId && r.key && r.readAt)
+    : [];
+
+  store.posts = Array.isArray(parsed.posts)
+    ? parsed.posts
+        .filter((p): p is Partial<Post> => Boolean(p && typeof p === "object"))
+        .map((p) => {
+          const m = sanitizePersistedMedia((p as { media?: unknown }).media);
+          return {
+            id: String(p.id ?? ""),
+            userId: String(p.userId ?? ""),
+            content: String(p.content ?? ""),
+            ...(m && m.length > 0 ? { media: m } : {}),
+            workoutId: p.workoutId === null ? null : String(p.workoutId ?? ""),
+            visibility:
+              p.visibility === "followers" || p.visibility === "private" || p.visibility === "public"
+                ? p.visibility
+                : "public",
+            createdAt: String(p.createdAt ?? ""),
+            updatedAt: String(p.updatedAt ?? ""),
+          };
+        })
+        .filter((p) => p.id && p.userId)
+    : [];
   store.likes = Array.isArray(parsed.likes) ? parsed.likes : [];
   store.comments = Array.isArray(parsed.comments) ? parsed.comments : [];
   store.follows = Array.isArray(parsed.follows) ? parsed.follows : [];
+
+  store.storyReels = Array.isArray(parsed.storyReels)
+    ? parsed.storyReels
+        .filter((r): r is Partial<StoryReel> => Boolean(r && typeof r === "object"))
+        .map((r) => ({
+          id: String((r as StoryReel).id ?? ""),
+          userId: String((r as StoryReel).userId ?? ""),
+          slides: Array.isArray((r as StoryReel).slides)
+            ? (r as StoryReel).slides
+                .filter((s): s is Partial<StorySlide> => Boolean(s && typeof s === "object"))
+                .map((s) => ({
+                  id: String((s as StorySlide).id ?? ""),
+                  mediaUrl: String((s as StorySlide).mediaUrl ?? ""),
+                }))
+                .filter((s) => s.id && s.mediaUrl)
+            : [],
+          createdAt: String((r as StoryReel).createdAt ?? ""),
+          expiresAt: String((r as StoryReel).expiresAt ?? ""),
+        }))
+        .filter((r) => r.id && r.userId && r.slides.length > 0 && r.expiresAt)
+    : [];
 
   if (migrationDirty.value) {
     saveStore();
@@ -351,6 +441,9 @@ export function initializeStore() {
 }
 
 export function saveStore() {
+  if (process.env.VITEST === "true" || process.env.NODE_ENV === "test") {
+    return;
+  }
   const dataFilePath = getDataFilePath();
   mkdirSync(dirname(dataFilePath), { recursive: true });
   writeFileSync(dataFilePath, JSON.stringify(store, null, 2), "utf-8");

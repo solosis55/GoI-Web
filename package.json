@@ -12,7 +12,8 @@
     "start:deploy": "node server/dist/server.js",
     "lint": "eslint .",
     "preview": "vite preview",
-    "seed:demo-users": "npm run seed:demo-users --prefix server"
+    "seed:demo-users": "npm run seed:demo-users --prefix server",
+    "reset:demo-users": "npm run reset:demo-users --prefix server"
   },
   "dependencies": {
     "react": "^19.2.5",

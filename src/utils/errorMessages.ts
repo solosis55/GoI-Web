@@ -7,6 +7,8 @@ const codeMessageMap: Record<string, string> = {
   AUTH_LOGIN_INVALID_INPUT: "Debes introducir email y contraseña.",
   AUTH_UNAUTHORIZED: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   AUTH_TOKEN_INVALID: "Tu sesión no es válida. Vuelve a iniciar sesión.",
+  AUTH_SESSION_STALE:
+    "Tu sesión ya no coincide con el servidor (los datos locales se reiniciaron o otro entorno). Cierra sesión e inicia sesión otra vez.",
   AUTH_FORBIDDEN: "No tienes permisos para realizar esta acción.",
   AUTH_PROFILE_INVALID_INPUT: "Revisa los datos del perfil y vuelve a intentarlo.",
   AUTH_RATE_LIMITED: "Demasiados intentos. Espera unos minutos antes de reintentar.",
@@ -17,7 +19,12 @@ const codeMessageMap: Record<string, string> = {
   AUTH_RESET_TOKEN_INVALID: "El enlace de restablecimiento no es válido o ha caducado. Solicita uno nuevo.",
   AUTH_USER_NOT_FOUND: "El usuario no existe.",
   POST_FORBIDDEN: "No puedes modificar esta publicación.",
-  POST_INVALID_INPUT: "La publicación debe tener entre 4 y 280 caracteres.",
+  STORY_INVALID_SLIDES: "La historia debe incluir entre 1 y 15 fotos válidas (JPG, PNG o WebP).",
+  POST_MEDIA_INVALID:
+    "Las imágenes no son válidas (formato, tamaño o cantidad). Reduce el número de fotos o prueba otra imagen.",
+  POST_INVALID_INPUT:
+    "Revisa el texto: sin fotos, entre 4 y 280 caracteres; con fotos, texto opcional hasta 280.",
+  POST_INVALID_VISIBILITY: "La visibilidad de la publicación no es válida.",
   COMMENT_INVALID_INPUT: "El comentario debe tener entre 1 y 180 caracteres.",
   POST_WORKOUT_NOT_FOUND: "La rutina vinculada no existe.",
   POST_USER_NOT_FOUND: "No se encontró el usuario de la publicación.",

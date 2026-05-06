@@ -21,7 +21,12 @@ export class ApiError extends Error {
 }
 
 function shouldExpireSession(status: number, code: string) {
-  return status === 401 || code === "AUTH_UNAUTHORIZED" || code === "AUTH_TOKEN_INVALID";
+  return (
+    status === 401 ||
+    code === "AUTH_UNAUTHORIZED" ||
+    code === "AUTH_TOKEN_INVALID" ||
+    code === "AUTH_SESSION_STALE"
+  );
 }
 
 function fallbackMessageForFailedRequest(status: number): string {

@@ -1,16 +1,10 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import app from "../app.js";
 import { DEFAULT_EXERCISE_SEED } from "../data/defaultExercises.js";
 import { store } from "../services/store.js";
 
 const SAMPLE_EXERCISE_ID = DEFAULT_EXERCISE_SEED[0]!.id;
-
-const storeFilePath = resolve(process.cwd(), "data/store.json");
-
-let originalStoreContent = "";
 
 async function registerAndLogin(email: string, username: string, password: string) {
   await request(app).post("/api/auth/register").send({ email, username, password }).expect(201);
@@ -19,9 +13,7 @@ async function registerAndLogin(email: string, username: string, password: strin
 }
 
 describe("auth + workouts security flow", () => {
-  beforeAll(() => {
-    originalStoreContent = readFileSync(storeFilePath, "utf-8");
-  });
+  /** Memoria aislada: `saveStore()` no escribe disco bajo Vitest (ver `store.ts`). Sin backup/restore de `store.json` para no pisar datos de desarrollo. */
 
   beforeEach(() => {
     store.users = [];
@@ -32,10 +24,7 @@ describe("auth + workouts security flow", () => {
     store.likes = [];
     store.comments = [];
     store.follows = [];
-  });
-
-  afterAll(() => {
-    writeFileSync(storeFilePath, originalStoreContent, "utf-8");
+    store.storyReels = [];
   });
 
   it("returns standardized error on invalid login", async () => {
@@ -97,6 +86,39 @@ describe("auth + workouts security flow", () => {
 
     expect(response.status).toBe(403);
     expect(response.body.code).toBe("WORKOUT_FORBIDDEN");
+  });
+
+  it("rejects GET profile without authorization", async () => {
+    await registerAndLogin("nauth.profile@test.com", "nauthprofile", "123456");
+    const userId = store.users.find((u) => u.username === "nauthprofile")!.id;
+
+    const response = await request(app).get(`/api/auth/profile/${userId}`);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe("AUTH_HEADER_INVALID");
+  });
+
+  it("includes email only when viewing own profile", async () => {
+    await registerAndLogin("owner.pub@test.com", "ownerpub", "123456");
+    const viewerToken = await registerAndLogin("viewer.pub@test.com", "viewerpub", "123456");
+    const ownerId = store.users.find((u) => u.username === "ownerpub")!.id;
+    const ownerToken = (
+      await request(app).post("/api/auth/login").send({ email: "owner.pub@test.com", password: "123456" })
+    ).body.token as string;
+
+    const ownView = await request(app)
+      .get(`/api/auth/profile/${ownerId}`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .expect(200);
+
+    expect(ownView.body.user.email).toBe("owner.pub@test.com");
+
+    const otherView = await request(app)
+      .get(`/api/auth/profile/${ownerId}`)
+      .set("Authorization", `Bearer ${viewerToken}`)
+      .expect(200);
+
+    expect(otherView.body.user.email).toBeUndefined();
+    expect(otherView.body.user.username).toBe("ownerpub");
   });
 
   it("prevents updating profile of another user", async () => {

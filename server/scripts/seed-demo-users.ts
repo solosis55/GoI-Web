@@ -32,9 +32,9 @@ async function main() {
       username,
       email,
       password: passwordHash,
-      bio: "",
-      goal: "",
-      avatarUrl: "",
+      bio: sanitizeText(row.bio) ?? "",
+      goal: sanitizeText(row.goal) ?? "",
+      avatarUrl: sanitizeText(row.avatarUrl) ?? "",
       createdAt: now,
       updatedAt: now,
     };
