@@ -31,6 +31,7 @@ html[data-theme="healthy"] {
 
 /* Encendido: acento terracota / naranja quemado (legible sobre blanco). */
 html[data-theme="encendido"] {
+  --goi-page-bg: #f5f1ed;
   --color-goi-gold: #c4511e;
   --color-goi-gold-dim: #8c3818;
   scrollbar-color: #c4511e #e4e4e7;
@@ -38,6 +39,7 @@ html[data-theme="encendido"] {
 
 /* Claro Healthy: un solo verde suave (sage); sin mezclar tonos muy oscuros con mentas. */
 html[data-theme="healthy"] {
+  --goi-page-bg: #f6f7f6;
   --color-goi-gold: #5f746b;
   --color-goi-gold-dim: #4a5e56;
   --color-goi-steel: #889892;

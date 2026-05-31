@@ -14,7 +14,7 @@ Cualquier cambio relevante de **producto, UX, API, despliegue o convenciones de 
 
 ## Estado
 - Fecha de inicio: 2026-04-27
-- Fase actual: Cierre del MVP y estandarizacion de UI con Tailwind
+- Fase actual: Cierre del MVP y estandarizacion de UI con Tailwind; refuerzo de **marca multi-tema**, **auth post-registro**, **feed** (ir al propio perfil) y **estadísticas / mapa muscular**.
 - Ultimo refinamiento UX + marca: shell **negro**, marca **GoI** (logo circular centrado en sidebar, tokens **oro/acero**), paneles **zinc** con acentos dorados, formularios con **`.goi-field`**, pulido global (**seleccion de texto**, **scrollbars** oscuros, **`prefers-reduced-motion`**, **focus-visible** en enlaces y botones). **Inicio**: encabezado de pagina, feed a ancho util, historias compactas (**reels de imagenes** caducadas en servidor tras ~24 h, visibilidad tipo seguidos + tu propio carrete). **Rutinas**: dashboard con resumen + calendario + lista, editor dedicado y breadcrumb visual; sin bloque de registro/historial en esa pestaña para reducir saturacion. **Pie** global `SiteFooter`.
 - Operativa desarrollo (**store JSON + JWT local**): si se reinicia o sustituye `store.json` y el navegador conserva JWT, pueden aparecer acciones escritoras fallidas hasta volver a iniciar sesion; el backend usa `401` + **`AUTH_SESSION_STALE`** en ese caso y el cliente fuerza **`auth:expired`**. Para cuentas `*@test.com` reproducibles existe **`npm run seed:demo-users`** (solo emails nuevos) y **`npm run reset:demo-users`** (upsert de las cuatro cuentas y password `123456` segun `demoUsers.ts`; ver **`README.md`**).
 
@@ -309,6 +309,20 @@ Actualizacion reciente:
 114. **Despliegue y URLs.** Creado **`docs/deployment.md`** como entrada que enlaza la guía completa **`docs/deploy.md`** (requisito nombre `deployment.md`). En **`README.md`**, sección **Despliegue**: tabla **Producción (URLs)** con placeholders para front y nota API mismo origen / `VITE_API_URL`; comprobación **`GET /api/health`**.
 
 115. **Retrospectiva (`docs/retrospective.md`).** Documento de cierre: revisión de docs API/red, síntesis React + Express + cliente HTTP, tabla de problemas típicos, sección de uso de IA y reflexión final con bloques *[Personalizar]*; enlace en **`README.md`**.
+
+116. **Marca por tema (ThemeContext) y assets PNG.** `src/utils/brandingLogo.ts` devuelve la ruta del logo según `theme`: **Legacy** → `/branding/goi-logo-mark.png`; **Encendido** → `goi-logo-theme-encendido.png`; **Healthy** → `goi-logo-theme-healthy.png`; **Neon** → `goi-logo-theme-neon.png` (todos bajo `public/branding/`). El archivo **mark** es el que debe sustituirse para cambiar solo el logo Legacy (sin renombrar rutas en código).
+
+117. **Pantalla de login / hero de marca (`GoISidebarBadge` + `LoginHeroBrand`).** Con `presentation="hero"` y `heroHalo`, el PNG del logo rellena el círculo con **`object-cover`**, posición centrada y ligera **`scale`** para recortar márgenes del PNG; en temas claros (`light:`) se aplica **`mix-blend-multiply`** para suavizar fondos opacos del asset. El anillo del logo conserva **`overflow-hidden`** y sombras; el **halo** animado (`.goi-hero-halo` en `index.css`) mantiene tamaño **188×188** px (móvil) y **236×236** px (`sm`). Modo **compact** (sidebar): imagen **`object-contain`** en porcentaje del anillo, sin halo.
+
+118. **Registro: token + usuario alineados en cliente y servidor.** `POST /api/auth/register` responde **201** con **`user`** (sanitizado) y **`token`** JWT (`signAuthToken(user.id)`), además de `message` (`authController.register`). En **`AuthPage`**, tras `register()`, si la respuesta incluye **`reg.token` y `reg.user`** se llama a **`setAuth(reg.token, reg.user)`**; si no (compatibilidad), se hace **`login`** y se usa **`loginResponse.user`** con el token de login para evitar desajuste `sub` del JWT vs objeto usuario y errores de tipo «perfil inexistente» tras crear cuenta.
+
+119. **Feed — «Ir al perfil» desde la cuenta propia.** `UserPublicProfileModal` no abre modal cuando `userId === currentUserId`. **`App.tsx`** pasa **`onGoToOwnProfile`** a **`FeedPage`**, que reenvía **`onGoToProfile`** a **`FeedSidebar`** / **`UserSummaryCard`**: al pulsar **Ir al perfil** con la sesión actual se limpia visita de perfil externo y se navega a la pestaña **Perfil** (`goTo("profile")`), sin quedar en un modal vacío.
+
+120. **Estadísticas — mapa corporal muscular.** Pestaña **Estadísticas** (`StatisticsPage` → **`StatisticsPersonalTab`**). Componente **`MuscleBodyGlowMapBasic`**: siluetas frontal/dorsal con resaltado por intensidad según datos de sesiones; mapeo de zonas SVG ↔ ejes del octágono en **`src/utils/muscleBodyMapSvgZones.ts`** (`MUSCLE_MAP_AXIS_TO_SVG_IDS`, `MUSCLE_MAP_PATH_FALLBACK_LABEL`). Existe además **`MuscleBodyGlowMap.tsx`** (variante con más detalle SVG). Documentación cruzada en **`docs/components.md`** y **`src/pages/README.md`**.
+
+121. **Persistencia de usuarios (recordatorio operativo).** Los usuarios creados por registro se añaden a **`store.users`** y se escriben en el JSON configurado por **`getDataFilePath()`** (por defecto **`server/data/store.json`**; variables **`GOI_STORE_PATH`** / **`FITSOCIAL_STORE_PATH`**; en Vercel **`/tmp/goi-store.json`**). Tras editar el JSON a mano o seed, reiniciar el proceso del API.
+
+122. **Shell claro y variable CSS `--goi-page-bg`.** `App.tsx`, **`SiteFooter`** y **`LoginHeroBrand`** usan `light:bg-[var(--goi-page-bg)]` y **`light:focus-visible:ring-offset-[var(--goi-page-bg)]`** para alinear fondo y anillo de foco en temas **Encendido / Healthy**. Valores definidos en **`src/index.css`**: Encendido **`#f5f1ed`**, Healthy **`#f6f7f6`** (ajustables en un solo sitio).
 
 ## Usuarios demo y fichero JSON (operativa rapida)
 

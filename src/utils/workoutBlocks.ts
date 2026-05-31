@@ -1,5 +1,7 @@
+import type { Exercise } from "../types/exercise";
 import type { WorkoutExerciseBlock, WorkoutSetRow } from "../types/workout";
 import type { WorkoutSetTypeSlug } from "../data/workoutSetTypes";
+import { defaultEquipmentSlugForExercise } from "./exerciseEquipmentLimits";
 
 const DEFAULT_SET_TYPE: WorkoutSetTypeSlug = "normal";
 
@@ -7,17 +9,18 @@ export function createEmptySet(): WorkoutSetRow {
   return { reps: "", weight: "", setType: DEFAULT_SET_TYPE };
 }
 
-export function createBlockForExercise(exerciseId: string): WorkoutExerciseBlock {
+export function createBlockForExercise(exerciseId: string, exercise?: Exercise): WorkoutExerciseBlock {
   return {
     exerciseId,
-    equipmentSlug: "",
+    equipmentSlug: defaultEquipmentSlugForExercise(exercise),
     laterality: "bilateral",
     sets: [createEmptySet()],
   };
 }
 
-export function blocksFromExerciseIds(ids: string[]): WorkoutExerciseBlock[] {
-  return ids.map((exerciseId) => createBlockForExercise(exerciseId));
+export function blocksFromExerciseIds(ids: string[], catalog?: Exercise[]): WorkoutExerciseBlock[] {
+  const byId = catalog ? new Map(catalog.map((e) => [e.id, e])) : null;
+  return ids.map((exerciseId) => createBlockForExercise(exerciseId, byId?.get(exerciseId)));
 }
 
 export function exerciseIdsFromBlocks(blocks: WorkoutExerciseBlock[]): string[] {

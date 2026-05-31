@@ -36,6 +36,7 @@ export const MUSCLE_OCTAGON_LABELS: Record<MuscleOctagonAxis, string> = {
 };
 
 const SLUG_TO_OCT: Record<string, MuscleOctagonAxis[]> = {
+  pecho: ["pecho"],
   biceps: ["brazos"],
   triceps: ["brazos"],
   antebrazos: ["brazos"],

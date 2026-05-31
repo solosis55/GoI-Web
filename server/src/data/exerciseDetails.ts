@@ -10,16 +10,17 @@ export type ExerciseDetailFields = {
 
 export const EXERCISE_DETAILS_BY_ID: Record<string, ExerciseDetailFields> = {
   "b2955b8a-6c26-498c-8623-40e85fe01b24": {
-    equipment: "Banco plano, barra, discos, rack o soporte",
-    description: "Press horizontal con barra en banco. Clásico de empuje de tronco que prioriza pectoral y tríceps con estabilidad de hombros.",
+    equipment: "Barra, mancuernas, máquina, palanca o polea; banco plano",
+    description:
+      "Movimiento de empuje horizontal de pecho. Elige el material en la rutina: barra en banco, mancuernas, máquina guiada, convergente o poleas.",
     instructions:
-      "Tumbado en el banco, pies firmes en el suelo. Agarra la barra algo más ancha que los hombros. Baja controlada al pecho y empuja en arco hasta extender sin despegar glúteos del banco. Mantén muñecas neutras y omóplatos retraídos.",
+      "Ajusta banco y material. Empuja en arco controlado; baja sin rebote. Con barra: agarre algo más ancho que hombros y omóplatos retraídos. Con mancuernas o polea: codos ~45° del torso.",
   },
   "518c7ced-16c8-49e7-8e9c-78b778a29762": {
-    equipment: "Banco inclinado, mancuernas",
-    description: "Press en banco inclinado con mancuernas para enfatizar la parte superior del pecho y deltoides anterior.",
+    equipment: "Barra, mancuernas, máquina o polea; banco inclinado",
+    description: "Empuje inclinado que enfatiza la parte superior del pecho y deltoides anterior.",
     instructions:
-      "Inclina el banco ~30–45°. Parte con las mancuernas a la altura de hombros, codos ~45° del torso. Sube en arco convergente sin chocar las pesas arriba; baja controlando el estiramiento.",
+      "Inclina el banco ~30–45°. Misma lógica de press: trayectoria controlada, sin bloquear fuerte si molesta el hombro.",
   },
   "33d02938-22b2-41ed-a106-aec6a0482635": {
     equipment: "Mancuernas o poleas/cables",
@@ -40,16 +41,10 @@ export const EXERCISE_DETAILS_BY_ID: Record<string, ExerciseDetailFields> = {
       "Agarre prono o neutro según comodidad. Deprime escápulas antes de tirar. Lleva la barra/manija al pecho alto o clavícula sin balancear. Controla la fase excéntrica.",
   },
   "161b32d3-4067-4ab4-9a9d-b1d9e356c903": {
-    equipment: "Barra, discos",
-    description: "Remo horizontal con barra; fuerza de espalda media y bíceps con núcleo estable.",
+    equipment: "Barra, mancuernas, polea o máquina de remo",
+    description: "Tirón horizontal al torso. Variante bilateral o unilateral según material (p. ej. remo con mancuerna a una mano).",
     instructions:
-      "Bisagra de cadera, espalda neutra, pecho abierto. Tira de la barra hacia el ombligo o bajo pecho; codos van atrás, no hacia fuera como un press. No redondear lumbar.",
-  },
-  "3e74c647-07b0-4c57-9f1b-a45883cde762": {
-    equipment: "Máquina de remo sentado o similar",
-    description: "Remo guiado útil para aprender trayectoria y cargar con menos demanda de estabilidad.",
-    instructions:
-      "Ajusta el asiento para que el pecho quede alto en el apoyo. Agarre neutro o prono. Tira llevando codos atrás; no hiperextender la lumbar al final del recorrido.",
+      "Espalda neutra, pecho abierto. Tira hacia el abdomen o bajo pecho; codos atrás. En máquina: ajusta asiento y apoyo torácico.",
   },
   "a80b0874-8893-4f6b-ba92-d6a33be87d15": {
     equipment: "Barra y discos o hex/trap bar",

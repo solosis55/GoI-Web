@@ -42,6 +42,8 @@ Antes de llamar al API se comprueban reglas básicas; si fallan se lanza error y
       }
 ```
 
+Tras las comprobaciones locales, en **registro** la respuesta de **`POST /api/auth/register`** incluye **`token`** y **`user`**: el cliente llama a **`setAuth(reg.token, reg.user)`**. Si la respuesta no trajera ambos campos, se haría **`login`** y se usaría el usuario devuelto por login con su JWT (evita desajuste entre `sub` del token y el objeto usuario). Detalle en **`docs/api.md`** y **`docs/project-management.md`** (§118).
+
 ---
 
 ## Ejemplo 3 — validación derivada del borrador (publicación)

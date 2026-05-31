@@ -945,7 +945,11 @@ export function FeedPage({
     <section className="feed-layout grid w-full min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:gap-6">
       <section className="feed-main flex min-w-0 w-full flex-col gap-5 pb-20 lg:gap-6 lg:pb-0">
         <div className="mx-auto w-full max-w-xl sm:max-w-2xl">
-        <header className="feed-page-header relative overflow-visible rounded-2xl border border-neutral-800/75 bg-linear-to-b from-neutral-950 via-neutral-950 to-neutral-950/90 px-4 py-5 shadow-[0_14px_44px_-20px_rgba(0,0,0,0.65)] sm:px-6 sm:py-6 light:border-zinc-200/90 light:from-white light:via-white light:to-zinc-50 light:shadow-[0_14px_40px_-18px_rgba(24,24,27,0.12)]">
+        <header className="feed-page-header relative overflow-hidden rounded-2xl border border-neutral-800/75 bg-linear-to-b from-neutral-950 via-neutral-950 to-neutral-950/90 px-4 py-5 shadow-[0_14px_44px_-20px_rgba(0,0,0,0.65)] sm:px-6 sm:py-6 light:border-zinc-200/90 light:from-white light:via-white light:to-zinc-50 light:shadow-[0_14px_40px_-18px_rgba(24,24,27,0.12)]">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[2px] bg-linear-to-r from-goi-gold/85 via-goi-gold/40 to-transparent light:from-amber-500 healthy:from-goi-gold/88 light:via-amber-400/45 healthy:via-goi-gold/38"
+          />
           <div
             aria-hidden
             className="pointer-events-none absolute -right-20 -top-28 z-0 h-52 w-52 rounded-full bg-goi-gold/[0.07] blur-3xl encendido:bg-orange-400/16 healthy:bg-goi-gold/[0.11]"
@@ -1019,7 +1023,7 @@ export function FeedPage({
                   id="feed-gym-stories-title"
                   className="text-base font-semibold tracking-tight text-neutral-100 sm:text-[1.05rem] light:text-zinc-900"
                 >
-                  Historias del gym
+                  GoI Daily
                 </h2>
                 {user && gymStoriesActiveCount > 0 ? (
                   <span className="inline-flex items-center rounded-full border border-goi-gold/25 bg-goi-gold/14 px-2 py-0.5 text-goi-gold light:border-goi-gold/40 light:bg-goi-gold/[0.11] healthy:border-goi-gold/32 healthy:bg-goi-gold/[0.11] light:text-goi-gold-dim healthy:text-goi-gold-dim">
@@ -1033,8 +1037,8 @@ export function FeedPage({
               <button
                 type="button"
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-neutral-600/55 bg-neutral-900/25 text-[12px] font-semibold leading-none text-neutral-500 transition-colors hover:border-goi-gold/45 hover:text-goi-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/40 light:border-zinc-300 light:bg-white light:text-zinc-600 light:hover:border-amber-400/60 healthy:hover:border-goi-gold/34"
-                title="Desliza horizontalmente. Anillo dorado: contenido nuevo para ti. Las historias son visibles unas ~24 h."
-                aria-label="Ayuda sobre historias del gym"
+                title="Desliza horizontalmente. Anillo dorado: contenido nuevo para ti. Cada GoI Daily es visible unas ~24 h."
+                aria-label="Ayuda sobre GoI Daily"
               >
                 i
               </button>

@@ -71,6 +71,44 @@ describe("posts security flow", () => {
     expect(commentResponse.body.code).toBe("AUTH_HEADER_INVALID");
   });
 
+  it("lists post likes for authorized viewers", async () => {
+    const ownerToken = await registerAndLogin("owner.likeslist@test.com", "ownerlikes", "123456");
+    const fanToken = await registerAndLogin("fan.likeslist@test.com", "fanlikes", "123456");
+    const created = await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ content: "Post con likes", workoutId: null })
+      .expect(201);
+
+    await request(app)
+      .post(`/api/posts/${created.body.id}/likes`)
+      .set("Authorization", `Bearer ${fanToken}`)
+      .expect(200);
+
+    const list = await request(app)
+      .get(`/api/posts/${created.body.id}/likes`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .expect(200);
+
+    expect(list.body.total).toBe(1);
+    expect(list.body.likes).toHaveLength(1);
+    expect(list.body.likes[0].username).toBe("fanlikes");
+    expect(list.body.likes[0].likedAt).toBeTruthy();
+  });
+
+  it("rejects listing likes without token", async () => {
+    const ownerToken = await registerAndLogin("owner.likes401@test.com", "ownerlikes401", "123456");
+    const created = await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ content: "Post privado likes", workoutId: null })
+      .expect(201);
+
+    const response = await request(app).get(`/api/posts/${created.body.id}/likes`);
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe("AUTH_HEADER_INVALID");
+  });
+
   it("prevents deleting post owned by another user", async () => {
     const ownerToken = await registerAndLogin("owner.post@test.com", "ownerpost", "123456");
     const intruderToken = await registerAndLogin("intruder.post@test.com", "intruderpost", "123456");

@@ -35,7 +35,7 @@ El API vive en **`server/`**: **rutas → controladores → servicios**, persist
 3. Express valida, escribe o lee datos y responde con JSON.
 4. Los tipos **`src/types/`** alinean lo que espera el front con las respuestas reales; cuando hay desajuste, falla en compilación o en runtime (`ApiError`).
 
-*[Opcional — personalizar]: Un párrafo propio sobre lo que más os ha ayudado a entender este flujo (primer CRUD, primer bug de CORS, etc.).*
+Al hacer este proyecto lo que mas he podido aprender es como va el "flujo" de la aplicación , a pensar desde fuera como querria que funcionase siendo un usuario , y desde ahi montarlo todo. He podido entender mejor las herramientas que utilizo y la busqueda de otras.
 
 ---
 
@@ -51,7 +51,11 @@ Ejemplos **habituales** en un proyecto como este (acompañad con **vuestros caso
 | **Payloads grandes** | Imágenes base64 en posts/historias. | **`express.json({ limit: "18mb" })`** en [**app.ts**](../server/src/app.ts). |
 | **UX compleja** | Compositor de publicaciones, recorte, responsive. | Iteración por fases documentada en **project-management**. |
 
-*[Personalizar]: Lista corta de 2–3 bugs o fricciones que más tiempo os llevaron y la solución final.*
+Bugs mas notorios:
+-Fallos de CSS en el diseño (descuadres , colores , animaciones mal plantedas)
+-Conexiones y despliegues con Vercel
+-Crear usuarios y mantener su información en el proyecto
+-fallos de almacenamiento en general ya que no se dispone de base de datos
 
 ---
 
@@ -65,7 +69,7 @@ Durante el proyecto se utilizó asistencia de **IA generativa** (por ejemplo en 
 
 La **responsabilidad** del diseño, las decisiones de arquitectura, las pruebas manuales y la coherencia con el negocio siguen siendo del equipo. La IA no sustituye la revisión de seguridad (JWT, rate limit, validación en servidor) ni el despliegue real.
 
-*[Personalizar]: Indicad herramienta aproximada (si la política del centro lo permite), frecuencia y qué partes **no** delegasteis a IA.*
+La verdad que me he ayudado muchisimo con la IA y el agent , he tenido que ver algunas partes para aprender su funcionamiento y el diseño CSS aun habiendome ayudado al implementarlo , ha sido por obra propia
 
 ---
 
@@ -75,7 +79,7 @@ La **responsabilidad** del diseño, las decisiones de arquitectura, las pruebas 
 
 **Deuda / siguiente paso:** persistencia en fichero JSON adecuada para demos; migración a base de datos gestionada cuando el producto lo exija; email real para recuperación de contraseña ([**design.md**](./design.md), pendientes).
 
-*[Personalizar]: Dos o tres frases sobre qué repetiríais en otro proyecto y qué haríais distinto.*
+Me he dado cuenta de que en este proyecto he ido muy disperso en lo que queria añadir ya que no tenia una idea clara ni unas metas ni controles , simplemente he ido añadiendo segun se me ocurria. Creo que es muy importante mejorar en este punto y por eso por ejemplo he añadido un diagrama en el roadmap del proyecto para ayudarme con ello. Sin duda algo que me ha ayudado mucho tambien es Vite para poner visualizar todo lo que hago y lo utilizare en otros proyectos.
 
 ---
 

@@ -19,6 +19,8 @@ import { useAuth } from "../context/AuthContext";
 import type { Exercise } from "../types/exercise";
 import type { Workout, WorkoutExerciseBlock } from "../types/workout";
 import { getErrorMessage } from "../utils/errorMessages";
+import { defaultEquipmentSlugForExercise, sanitizeEquipmentSlug } from "../utils/exerciseEquipmentLimits";
+import { sanitizeLaterality } from "../utils/exerciseLateralityLimits";
 import { blocksFromLegacy, createBlockForExercise } from "../utils/workoutBlocks";
 import {
   clearWorkoutCreateDraft,
@@ -99,6 +101,29 @@ export function WorkoutEditorPage({ mode, onBack, onSaved, onOpenFullCatalog, on
       });
   }, []);
 
+  /** Preselección / corrección de material y lateralidad al cargar el catálogo. */
+  useEffect(() => {
+    if (!exerciseCatalog.length) return;
+    setExerciseBlocks((prev) => {
+      if (!prev.length) return prev;
+      let changed = false;
+      const next = prev.map((b) => {
+        const ex = exerciseCatalog.find((e) => e.id === b.exerciseId);
+        if (!ex) return b;
+        const currentEq = b.equipmentSlug ?? "";
+        const fixedEq = currentEq.trim()
+          ? sanitizeEquipmentSlug(currentEq, ex)
+          : defaultEquipmentSlugForExercise(ex);
+        const fixedLat = sanitizeLaterality(b.laterality, fixedEq, ex);
+        const latSame = (b.laterality ?? "bilateral") === fixedLat;
+        if (fixedEq === currentEq && latSame) return b;
+        changed = true;
+        return { ...b, equipmentSlug: fixedEq, laterality: fixedLat };
+      });
+      return changed ? next : prev;
+    });
+  }, [exerciseCatalog]);
+
   const editWorkoutId = mode.mode === "edit" ? mode.workout.id : "";
   const appendExerciseIdsKey =
     mode.mode === "create" && mode.initialExerciseIds?.length
@@ -126,7 +151,7 @@ export function WorkoutEditorPage({ mode, onBack, onSaved, onOpenFullCatalog, on
       for (const id of mode.initialExerciseIds) {
         if (nextBlocks.length >= WORKOUT_EXERCISES_MAX) break;
         if (!nextBlocks.some((b) => b.exerciseId === id)) {
-          nextBlocks = [...nextBlocks, createBlockForExercise(id)];
+          nextBlocks = [...nextBlocks, createBlockForExercise(id, exerciseById.get(id))];
         }
       }
     }
@@ -248,7 +273,7 @@ export function WorkoutEditorPage({ mode, onBack, onSaved, onOpenFullCatalog, on
       let next = [...prev];
       for (const id of exerciseIds) {
         if (next.length >= WORKOUT_EXERCISES_MAX) break;
-        next.push(createBlockForExercise(id));
+        next.push(createBlockForExercise(id, exerciseById.get(id)));
       }
       return next;
     });

@@ -1,3 +1,4 @@
+
 import { randomUUID } from "node:crypto";
 import { EXERCISE_DETAILS_BY_ID } from "../data/exerciseDetails.js";
 import { DEFAULT_EXERCISE_SEED } from "../data/defaultExercises.js";
@@ -7,6 +8,14 @@ import {
   blocksFromExerciseIdsOnly,
   sanitizeExerciseBlocksPayload,
 } from "./workoutExerciseSanitize.js";
+import {
+  DEFAULT_PROFILE_SECTIONS,
+  normalizeDefaultPostVisibility,
+  normalizeProfileSections,
+  normalizeProfileVisibility,
+  type ProfileSectionSettings,
+  type ProfileVisibilityMode,
+} from "./profileVisibility.js";
 import type { WorkoutExerciseBlock } from "../workoutExerciseTypes.js";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -29,8 +38,16 @@ export type User = {
   stravaUrl: string;
   /** Texto corto (ciudad, gimnasio); público si el perfil lo es. */
   location: string;
-  /** Perfil completo visible solo a quien sigue al usuario (además de visibilidad por post). */
-  profileVisibility: "public" | "followers";
+  /** Quién puede ver el perfil completo (además de visibilidad por sección y por post). */
+  profileVisibility: ProfileVisibilityMode;
+  /** Visibilidad por bloques del perfil. */
+  profileSections: ProfileSectionSettings;
+  /** Si false, no aparece en descubrir aunque el perfil sea público. */
+  discoverable: boolean;
+  /** Reservado: requiere sesión para ver el perfil (la API ya exige auth). */
+  requireAuthToView: boolean;
+  /** Visibilidad por defecto al crear publicaciones. */
+  defaultPostVisibility: Post["visibility"];
   /** Publicación propia a destacar en el perfil / modal público. */
   pinnedPostId: string;
   createdAt: string;
@@ -39,6 +56,10 @@ export type User = {
   passwordResetTokenHash?: string;
   /** ISO 8601; caducidad del token de restablecimiento. */
   passwordResetExpires?: string;
+  /** Preferencias de notificaciones in-app (sincronizadas entre dispositivos). */
+  notificationPrefs?: {
+    mutedTypes: Array<"like" | "comment" | "follow">;
+  };
 };
 
 /** Ejercicio del catálogo global (semilla + creados al migrar textos libres). */
@@ -82,8 +103,12 @@ export type WorkoutSession = {
   /** ISO 8601 (instante aproximado de la sesion). */
   performedAt: string;
   notes: string;
+  /** Detalle estructurado al completar (series, ejercicios, métricas). */
+  snapshot?: import("../workoutSessionSnapshotTypes.js").WorkoutSessionSnapshot;
   createdAt: string;
 };
+
+export type PostFormat = "standard" | "training";
 
 export type Post = {
   id: string;
@@ -91,6 +116,10 @@ export type Post = {
   content: string;
   /** Imágenes en data URL (`data:image/jpeg;base64,...`). */
   media?: { type: "image"; url: string }[];
+  /** Diseño en feed: estándar (tipo Instagram) o training. */
+  format: PostFormat;
+  /** Sesión realizada vinculada (preferido frente a workoutId suelto). */
+  sessionId: string | null;
   workoutId: string | null;
   visibility: "public" | "followers" | "private";
   createdAt: string;
@@ -117,6 +146,14 @@ export type Follow = {
   id: string;
   followerId: string;
   followingId: string;
+  createdAt: string;
+  status: "active" | "pending";
+};
+
+export type UserBlock = {
+  id: string;
+  blockerId: string;
+  blockedId: string;
   createdAt: string;
 };
 
@@ -151,6 +188,7 @@ export const store = {
   likes: [] as Like[],
   comments: [] as Comment[],
   follows: [] as Follow[],
+  userBlocks: [] as UserBlock[],
   notificationReads: [] as NotificationReadRecord[],
   storyReels: [] as StoryReel[],
 };
@@ -188,6 +226,7 @@ type PersistedStore = {
   likes: Like[];
   comments: Comment[];
   follows: Follow[];
+  userBlocks?: UserBlock[];
   notificationReads?: NotificationReadRecord[];
   storyReels?: StoryReel[];
 };
@@ -376,7 +415,11 @@ export function initializeStore() {
         instagramUrl: user.instagramUrl ?? "",
         stravaUrl: user.stravaUrl ?? "",
         location: user.location ?? "",
-        profileVisibility: user.profileVisibility === "followers" ? "followers" : "public",
+        profileVisibility: normalizeProfileVisibility(user.profileVisibility),
+        profileSections: normalizeProfileSections(user.profileSections),
+        discoverable: user.discoverable !== false,
+        requireAuthToView: user.requireAuthToView === true,
+        defaultPostVisibility: normalizeDefaultPostVisibility(user.defaultPostVisibility),
         pinnedPostId: user.pinnedPostId ?? "",
         updatedAt: user.updatedAt ?? user.createdAt ?? new Date().toISOString(),
       }))
@@ -412,7 +455,13 @@ export function initializeStore() {
             userId: String(raw.userId ?? ""),
             content: String(raw.content ?? ""),
             ...(m && m.length > 0 ? { media: m } : {}),
-            workoutId: raw.workoutId === null ? null : String(raw.workoutId ?? ""),
+            format:
+              raw.format === "training" || raw.format === "standard" ? raw.format : "standard",
+            sessionId:
+              raw.sessionId === null || raw.sessionId === undefined || raw.sessionId === ""
+                ? null
+                : String(raw.sessionId),
+            workoutId: raw.workoutId === null ? null : String(raw.workoutId ?? "") || null,
             visibility: (
               raw.visibility === "followers" || raw.visibility === "private" || raw.visibility === "public"
                 ? raw.visibility
@@ -426,7 +475,13 @@ export function initializeStore() {
     : [];
   store.likes = Array.isArray(parsed.likes) ? parsed.likes : [];
   store.comments = Array.isArray(parsed.comments) ? parsed.comments : [];
-  store.follows = Array.isArray(parsed.follows) ? parsed.follows : [];
+  store.follows = Array.isArray(parsed.follows)
+    ? parsed.follows.map((f) => ({
+        ...f,
+        status: f.status === "pending" ? "pending" : "active",
+      }))
+    : [];
+  store.userBlocks = Array.isArray(parsed.userBlocks) ? parsed.userBlocks : [];
 
   store.storyReels = Array.isArray(parsed.storyReels)
     ? (parsed.storyReels as unknown[])

@@ -474,9 +474,18 @@ export function ExerciseCatalogPanel({
                       aria-label={`Seleccionar ${displayTitle}`}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-base font-semibold leading-snug tracking-tight text-neutral-100 sm:text-[1.05rem] light:text-zinc-900">
-                        {displayTitle}
-                      </span>
+                      <button
+                        type="button"
+                        className="group flex w-full min-w-0 items-center gap-1.5 text-left"
+                        onClick={() => onOpenExerciseDetail(ex.id)}
+                      >
+                        <span className="block min-w-0 flex-1 text-base font-semibold leading-snug tracking-tight text-neutral-100 transition-colors group-hover:text-goi-gold sm:text-[1.05rem] light:text-zinc-900 light:group-hover:text-yellow-900">
+                          {displayTitle}
+                        </span>
+                        <span className="shrink-0 text-lg text-neutral-600 transition-colors group-hover:text-goi-gold light:text-zinc-500" aria-hidden>
+                          ›
+                        </span>
+                      </button>
                       {metaLine ? (
                         <span className="mt-1.5 block text-xs leading-snug text-neutral-500 light:text-zinc-600">{metaLine}</span>
                       ) : null}

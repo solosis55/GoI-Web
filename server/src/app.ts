@@ -14,6 +14,7 @@ import exercisesRoutes from "./routes/exercisesRoutes.js";
 import workoutSessionsRoutes from "./routes/workoutSessionsRoutes.js";
 import workoutsRoutes from "./routes/workoutsRoutes.js";
 import { sendError } from "./services/http.js";
+import { ensureProfileUploadDirs, getUploadsRoot } from "./services/uploadPaths.js";
 import { initializeStore } from "./services/store.js";
 
 dotenv.config();
@@ -25,6 +26,7 @@ if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
 }
 
 initializeStore();
+ensureProfileUploadDirs();
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const clientDist = resolve(moduleDir, "../../dist");
@@ -32,6 +34,7 @@ const serveProductionClient =
   process.env.NODE_ENV === "production" && existsSync(join(clientDist, "index.html"));
 
 app.use(cors());
+app.use("/uploads", express.static(getUploadsRoot()));
 /** Historías y posts con fotos en base64; el límite por defecto (100 KB) corta payloads válidos. */
 app.use(express.json({ limit: "18mb" }));
 
@@ -86,7 +89,7 @@ if (serveProductionClient) {
       next();
       return;
     }
-    if (req.path.startsWith("/api")) {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
       next();
       return;
     }

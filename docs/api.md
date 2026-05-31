@@ -69,11 +69,11 @@ En producción/Vercel suele omitirse `devStore` (solo `ok`, `service`, `timestam
 }
 ```
 
-**Respuesta 201** (forma típica; campos exactos según controlador):
+**Respuesta 201** (cuerpo típico del controlador `authController.register`):
 
 ```json
 {
-  "message": "...",
+  "message": "user registered",
   "user": {
     "id": "uuid-...",
     "username": "cris_dev",
@@ -81,11 +81,12 @@ En producción/Vercel suele omitirse `devStore` (solo `ok`, `service`, `timestam
     "bio": "",
     "goal": "",
     "avatarUrl": ""
-  }
+  },
+  "token": "<JWT firmado con el id del usuario>"
 }
 ```
 
-**429** si rate limit (`code`: `AUTH_RATE_LIMITED`).
+El cliente debe guardar **`token`** y **`user`** juntos (`setAuth`) para que el `sub` del JWT coincida con el perfil cargado. **429** si rate limit (`code`: `AUTH_RATE_LIMITED`).
 
 ---
 
@@ -238,6 +239,30 @@ Actualización de texto/visibilidad del post del usuario.
 ### `DELETE /api/posts/:id`
 
 **200:** `{ "message": "...", "post": { ... } }` (forma típica).
+
+---
+
+### `GET /api/posts/:id/likes`
+
+JWT obligatorio. Lista usuarios que dieron me gusta al post (más recientes primero). Usuarios bloqueados respecto al viewer se omiten.
+
+**200:**
+
+```json
+{
+  "likes": [
+    {
+      "id": "<userId>",
+      "username": "atleta",
+      "avatarUrl": "https://…",
+      "likedAt": "2026-05-26T12:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+**401** sin token · **403** si no puedes ver el post · **404** post inexistente.
 
 ---
 

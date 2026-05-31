@@ -3,6 +3,7 @@
  * Pueden filtrarse varias a la vez: se muestran ejercicios que tocan **cualquiera** de los grupos elegidos.
  */
 export const CATALOG_MUSCLE_OPTIONS = [
+  { slug: "pecho", label: "Pecho" },
   { slug: "biceps", label: "Biceps" },
   { slug: "triceps", label: "Triceps" },
   { slug: "hombro", label: "Hombro" },

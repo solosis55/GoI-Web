@@ -1,6 +1,6 @@
 import { AUTH_STORAGE_KEY } from "../constants/storageKeys";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? (import.meta.env.PROD ? "/api" : "http://localhost:4000/api");
 const AUTH_EXPIRED_EVENT = "auth:expired";
 
@@ -43,7 +43,7 @@ function fallbackMessageForFailedRequest(status: number): string {
   return `La API respondió con un error (${status}).`;
 }
 
-function getStoredToken() {
+export function getStoredToken() {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;

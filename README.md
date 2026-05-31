@@ -81,7 +81,9 @@ En `server/`: `npm test` ejecuta Vitest.
 
 ## Marca visual (GoI)
 
-Logotipo en **`public/branding/goi-logo.png`** (reemplaza el archivo para actualizar la imagen). En la sidebar se muestra dentro de un **círculo** (contenedor con anillo dorado suave), **tamaño contenido** y bloque de marca **centrado** en el lateral. Los colores de acento en UI usan tokens Tailwind **`goi-gold` / `goi-steel`** en **`src/index.css`** (`@theme`), más la clase **`.goi-field`** para campos sobre fondos oscuros. Pulido global: **selección de texto** con tinte oro, **scrollbars** oscuros, **`prefers-reduced-motion`** y **focus-visible** (enlaces y botones). Detalle en **`docs/design.md`**.
+Logotipos por tema en **`public/branding/`** (rutas usadas por **`src/utils/brandingLogo.ts`**): **Legacy** → **`goi-logo-mark.png`**; **Encendido / Healthy / Neon** → `goi-logo-theme-*.png`. Sustituye el archivo correspondiente para actualizar la imagen sin cambiar código. Sigue existiendo **`goi-logo.png`** como recurso genérico si alguna ruta antigua lo usa.
+
+En la pantalla de bienvenida/login, **`GoISidebarBadge`** en modo **hero** con halo rellena el círculo con **`object-cover`** (menos borde visible del PNG) y animación **`.goi-hero-halo`**. En la sidebar autenticada compacta, el logo va **`object-contain`**. Los colores de acento en UI usan tokens Tailwind **`goi-gold` / `goi-steel`** en **`src/index.css`** (`@theme`), más la clase **`.goi-field`** para campos sobre fondos oscuros. Pulido global: **selección de texto** con tinte oro, **scrollbars** oscuros, **`prefers-reduced-motion`** y **focus-visible** (enlaces y botones). Detalle en **`docs/design.md`**.
 
 ## Documentacion al cambiar el proyecto
 

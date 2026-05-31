@@ -15,6 +15,12 @@ dist-ssr
 # Datos personales sincronizados por usuario (API local); no versionar métricas ni fotos.
 server/data/personal-body/*.json
 
+# Avatares y cabeceras subidos (API local); las URLs en store.json apuntan aquí.
+server/data/uploads/avatars/*
+server/data/uploads/banners/*
+!server/data/uploads/avatars/.gitkeep
+!server/data/uploads/banners/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

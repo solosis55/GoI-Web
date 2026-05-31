@@ -1,17 +1,29 @@
 import { Buffer } from "node:buffer";
 import { Request, Response } from "express";
 import { createId, saveStore, store, Post } from "../services/store.js";
+import { buildFeedPage, type FeedScopeParam } from "../services/feedTimeline.js";
 import { sendError } from "../services/http.js";
 import { normalizePostMediaFromRequest } from "../services/postMedia.js";
+import { isBlockedBetween } from "../services/profileVisibility.js";
+import { resolvePostSessionMeta } from "../services/postsSessionMeta.js";
 import { isLengthBetween, sanitizeText } from "../services/validation.js";
 
 type PostPayload = {
   content?: string;
+  format?: string;
+  sessionId?: string | null;
+  /** @deprecated Usar sessionId; se mantiene para clientes web antiguos. */
   workoutId?: string | null;
   visibility?: string;
   /** Imágenes en data URL JPEG/PNG/WebP. */
   media?: unknown;
 };
+
+function normalizePostFormat(raw: unknown): Post["format"] {
+  const t = sanitizeText(raw);
+  if (t === "training") return "training";
+  return "standard";
+}
 
 type CommentPayload = {
   content?: string;
@@ -26,6 +38,7 @@ type FeedNotification = {
   postId?: string;
   postPreview?: string;
   commentPreview?: string;
+  commentId?: string;
   createdAt: string;
 };
 
@@ -70,6 +83,7 @@ function buildNotificationsForRecipient(recipientId: string): FeedNotification[]
         postId: post.id,
         postPreview: postSnippetForNotify(post),
         commentPreview: comment.content.slice(0, 120),
+        commentId: comment.id,
         createdAt: comment.createdAt,
       };
     });
@@ -113,7 +127,10 @@ function canUserViewPost(post: Post, viewerUserId: string): boolean {
   if (post.userId === viewerUserId) return true;
   if (post.visibility === "public") return true;
   if (post.visibility === "followers") {
-    return store.follows.some((f) => f.followerId === viewerUserId && f.followingId === post.userId);
+    return store.follows.some(
+      (f) =>
+        f.followerId === viewerUserId && f.followingId === post.userId && f.status !== "pending",
+    );
   }
   return false;
 }
@@ -159,6 +176,7 @@ function mapPostWithInteractions(post: Post, viewerUserId: string) {
 
   return {
     ...post,
+    ...resolvePostSessionMeta(post),
     authorUsername: author?.username ?? "Usuario",
     authorAvatarUrl: author?.avatarUrl ?? "",
     likesCount: likes.length,
@@ -177,6 +195,37 @@ export function listPosts(_req: Request, res: Response) {
     .filter((p) => canUserViewPost(p, authUserId))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   res.json(posts.map((p) => mapPostWithInteractions(p, authUserId)));
+}
+
+export function listFeed(req: Request, res: Response) {
+  const authUserId = String(res.locals.authUserId ?? "");
+  if (!authUserId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+
+  const scopeRaw = typeof req.query.scope === "string" ? req.query.scope : "following";
+  const scope: FeedScopeParam = scopeRaw === "all" ? "all" : "following";
+
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
+
+  const cursor =
+    typeof req.query.cursor === "string"
+      ? req.query.cursor.trim()
+      : "";
+
+  const page = buildFeedPage(authUserId, scope, limit, cursor || undefined);
+
+  res.json({
+    items: page.items.map((item) =>
+      item.kind === "post"
+        ? { kind: "post", post: mapPostWithInteractions(item.post, authUserId) }
+        : item
+    ),
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+  });
 }
 
 export function listNotifications(_req: Request, res: Response) {
@@ -319,7 +368,15 @@ export function listPostsByUser(req: Request, res: Response) {
 
 export function createPost(req: Request, res: Response) {
   const authUserId = String(res.locals.authUserId ?? "");
-  const { content, workoutId = null, visibility, media: mediaRaw } = req.body as PostPayload;
+  const {
+    content,
+    format: rawFormat,
+    sessionId: rawSessionId = null,
+    workoutId: rawWorkoutId = null,
+    visibility,
+    media: mediaRaw,
+  } = req.body as PostPayload;
+  const postFormat = normalizePostFormat(rawFormat);
   const normalizedContent = sanitizeText(content);
   const normalizedVisibility = normalizeVisibility(visibility);
 
@@ -350,7 +407,26 @@ export function createPost(req: Request, res: Response) {
     return;
   }
 
-  if (workoutId) {
+  let sessionId: string | null = rawSessionId ? sanitizeText(rawSessionId) || null : null;
+  let workoutId: string | null = rawWorkoutId ? sanitizeText(rawWorkoutId) || null : null;
+
+  if (sessionId) {
+    const session = store.workoutSessions.find((s) => s.id === sessionId);
+    if (!session) {
+      sendError(res, 404, "POST_SESSION_NOT_FOUND", "session not found");
+      return;
+    }
+    if (session.userId !== authUserId) {
+      sendError(res, 403, "POST_SESSION_FORBIDDEN", "forbidden");
+      return;
+    }
+    const alreadyLinked = store.posts.some((p) => p.sessionId === sessionId);
+    if (alreadyLinked) {
+      sendError(res, 409, "POST_SESSION_ALREADY_LINKED", "session already linked to a post");
+      return;
+    }
+    workoutId = session.workoutId;
+  } else if (workoutId) {
     const workoutExists = store.workouts.some((workout) => workout.id === workoutId);
     if (!workoutExists) {
       sendError(res, 404, "POST_WORKOUT_NOT_FOUND", "workout not found");
@@ -363,6 +439,8 @@ export function createPost(req: Request, res: Response) {
     userId: authUserId,
     content: normalizedContent,
     ...(hasMedia ? { media: attachments } : {}),
+    format: postFormat,
+    sessionId,
     workoutId,
     visibility: normalizedVisibility,
     createdAt: new Date().toISOString(),
@@ -494,6 +572,44 @@ export function toggleLike(req: Request, res: Response) {
   });
   saveStore();
   res.json({ liked: true });
+}
+
+export function listPostLikes(req: Request, res: Response) {
+  const postId = String(req.params.id);
+  const viewerId = String(res.locals.authUserId ?? "");
+  if (!viewerId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+
+  const post = store.posts.find((item) => item.id === postId);
+  if (!post) {
+    sendError(res, 404, "POST_NOT_FOUND", "post not found");
+    return;
+  }
+  if (!canUserViewPost(post, viewerId)) {
+    sendError(res, 403, "POST_FORBIDDEN", "forbidden");
+    return;
+  }
+
+  const likes = store.likes
+    .filter((like) => like.postId === postId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .flatMap((like) => {
+      if (isBlockedBetween(viewerId, like.userId)) return [];
+      const user = store.users.find((u) => u.id === like.userId);
+      if (!user) return [];
+      return [
+        {
+          id: user.id,
+          username: user.username,
+          avatarUrl: user.avatarUrl ?? "",
+          likedAt: like.createdAt,
+        },
+      ];
+    });
+
+  res.json({ likes, total: likes.length });
 }
 
 export function createComment(req: Request, res: Response) {

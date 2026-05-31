@@ -15,16 +15,16 @@ export const MUSCLE_PENTAGON_LABELS: Record<MusclePentagonAxis, string> = {
   core: "Core",
 };
 
-/** Ejercicios del catálogo semilla orientados a pecho (tags legacy no incluyen `pecho`). */
+/** Respaldo por si un ejercicio antiguo en store.json aún no tiene slug `pecho`. */
 export const CHEST_EXERCISE_IDS = new Set<string>([
   "b2955b8a-6c26-498c-8623-40e85fe01b24",
   "518c7ced-16c8-49e7-8e9c-78b778a29762",
   "33d02938-22b2-41ed-a106-aec6a0482635",
   "798021a8-8c67-440b-babb-4e901776bb3d",
-  "9ea166aa-7ae2-481c-8b0e-55726f48dc66",
 ]);
 
 const SLUG_TO_AXES: Record<string, MusclePentagonAxis[]> = {
+  pecho: ["pecho"],
   biceps: ["brazo"],
   triceps: ["brazo"],
   antebrazos: ["brazo"],

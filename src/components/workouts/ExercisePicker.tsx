@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { CATALOG_EQUIPMENT_OPTIONS } from "../../data/exerciseEquipmentFilters";
+import { allowsUnilateralWithEquipment } from "../../data/equipmentLaterality";
+import {
+  equipmentOptionsForExercise,
+  exerciseHasEquipmentRestrictions,
+  isEquipmentSlugAllowed,
+} from "../../utils/exerciseEquipmentLimits";
+import {
+  isLateralityAllowed,
+  lateralityRestrictionHint,
+} from "../../utils/exerciseLateralityLimits";
 import { WORKOUT_SET_TYPE_OPTIONS } from "../../data/workoutSetTypes";
 import type { Exercise } from "../../types/exercise";
 import type { WorkoutExerciseBlock, WorkoutSetRow } from "../../types/workout";
@@ -78,6 +87,8 @@ export function ExercisePicker({
   /** Una entrada por índice de bloque: true = detalle colapsado (solo cabecera). */
   const [collapsedRows, setCollapsedRows] = useState<boolean[]>([]);
 
+  const catalogById = useMemo(() => new Map(catalog.map((e) => [e.id, e])), [catalog]);
+
   const byId = useMemo(() => new Map(catalog.map((e) => [e.id, e])), [catalog]);
 
   useEffect(() => {
@@ -99,7 +110,7 @@ export function ExercisePicker({
 
   function addId(id: string) {
     if (disabled || blocks.length >= WORKOUT_EXERCISES_MAX) return;
-    onChangeBlocks([...blocks, createBlockForExercise(id)]);
+    onChangeBlocks([...blocks, createBlockForExercise(id, catalogById.get(id))]);
     setQuery("");
   }
 
@@ -137,15 +148,23 @@ export function ExercisePicker({
   }
 
   function setEquipment(index: number, slug: string) {
+    const ex = catalogById.get(blocks[index]?.exerciseId ?? "");
+    if (!isEquipmentSlugAllowed(slug, ex)) return;
     onChangeBlocks(
-      updateBlock(blocks, index, (b) => ({
-        ...b,
-        equipmentSlug: b.equipmentSlug === slug ? "" : slug,
-      })),
+      updateBlock(blocks, index, (b) => {
+        const nextSlug = b.equipmentSlug === slug ? "" : slug;
+        const patch: WorkoutExerciseBlock = { ...b, equipmentSlug: nextSlug };
+        if (!isLateralityAllowed(b.laterality, nextSlug, ex)) {
+          patch.laterality = "bilateral";
+        }
+        return patch;
+      }),
     );
   }
 
   function setLaterality(index: number, slug: "bilateral" | "unilateral") {
+    const ex = catalogById.get(blocks[index]?.exerciseId ?? "");
+    if (!isLateralityAllowed(slug, blocks[index]?.equipmentSlug, ex)) return;
     onChangeBlocks(
       updateBlock(blocks, index, (b) => ({
         ...b,
@@ -182,36 +201,27 @@ export function ExercisePicker({
   }
 
   function exerciseBlockDetailFields(index: number, block: WorkoutExerciseBlock) {
+    const ex = catalogById.get(block.exerciseId);
+    const equipmentOpts = equipmentOptionsForExercise(ex);
+    const restricted = exerciseHasEquipmentRestrictions(ex);
+    const equipmentSlug = block.equipmentSlug ?? "";
+    const unilateralAllowed = allowsUnilateralWithEquipment(equipmentSlug);
+    const latHint = lateralityRestrictionHint(equipmentSlug);
+    const lateralityOptions = LATERALITY_OPTIONS.filter(
+      (opt) => opt.slug === "bilateral" || unilateralAllowed,
+    );
+
     return (
       <>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 light:text-zinc-600">Ejecución</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {LATERALITY_OPTIONS.map((opt) => {
-              const active = (block.laterality ?? "bilateral") === opt.slug;
-              return (
-                <button
-                  key={opt.slug}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setLaterality(index, opt.slug)}
-                  className={
-                    active
-                      ? "rounded-full border border-sky-500/40 bg-sky-950/40 px-2.5 py-1 text-xs text-sky-100"
-                      : "rounded-full border border-neutral-700 bg-neutral-950/80 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-500 disabled:opacity-40 light:border-zinc-300 light:bg-white light:text-zinc-800 light:hover:border-zinc-400"
-                  }
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 light:text-zinc-600">Material</p>
+            {restricted ? (
+              <span className="text-[10px] font-medium text-neutral-500 light:text-zinc-500">Variantes del movimiento</span>
+            ) : null}
           </div>
-        </div>
-
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 light:text-zinc-600">Material</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {CATALOG_EQUIPMENT_OPTIONS.map((opt) => {
+            {equipmentOpts.map((opt) => {
               const active = block.equipmentSlug === opt.slug;
               return (
                 <button
@@ -229,9 +239,40 @@ export function ExercisePicker({
                 </button>
               );
             })}
-            <span className="self-center text-[10px] text-neutral-600">
-              {block.equipmentSlug ? `· ${EQUIPMENT_LABEL[block.equipmentSlug] ?? block.equipmentSlug}` : "· opcional"}
-            </span>
+            {!restricted ? (
+              <span className="self-center text-[10px] text-neutral-600">
+                {block.equipmentSlug ? `· ${EQUIPMENT_LABEL[block.equipmentSlug] ?? block.equipmentSlug}` : "· opcional"}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 light:text-zinc-600">Lado</p>
+            {latHint ? (
+              <span className="text-[10px] font-medium text-neutral-500 light:text-zinc-500">{latHint}</span>
+            ) : null}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {lateralityOptions.map((opt) => {
+              const active = (block.laterality ?? "bilateral") === opt.slug;
+              return (
+                <button
+                  key={opt.slug}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => setLaterality(index, opt.slug)}
+                  className={
+                    active
+                      ? "rounded-full border border-sky-500/40 bg-sky-950/40 px-2.5 py-1 text-xs text-sky-100"
+                      : "rounded-full border border-neutral-700 bg-neutral-950/80 px-2.5 py-1 text-xs text-neutral-300 hover:border-neutral-500 disabled:opacity-40 light:border-zinc-300 light:bg-white light:text-zinc-800 light:hover:border-zinc-400"
+                  }
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

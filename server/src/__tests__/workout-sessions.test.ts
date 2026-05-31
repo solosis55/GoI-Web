@@ -89,6 +89,149 @@ describe("workout sessions API", () => {
     expect(response.body.code).toBe("WORKOUT_FORBIDDEN");
   });
 
+  it("derives snapshot from workout when session has no stored snapshot", async () => {
+    const token = await registerAndLogin("session.derive@test.com", "sessionderive", "123456");
+
+    const created = await request(app)
+      .post("/api/workouts")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "Pecho", description: "", exerciseIds: [SAMPLE_EXERCISE_ID] })
+      .expect(201);
+
+    const sessionRes = await request(app)
+      .post("/api/workout-sessions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        workoutId: created.body.id,
+        notes: "4/4 series completadas",
+      })
+      .expect(201);
+
+    expect(sessionRes.body.snapshot).toBeUndefined();
+
+    const detail = await request(app)
+      .get(`/api/workout-sessions/${sessionRes.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(detail.body.snapshot?.blocks?.length).toBeGreaterThan(0);
+    expect(detail.body.snapshot?.blocks[0]?.exerciseName).toBeTruthy();
+  });
+
+  it("returns session detail for owner with snapshot", async () => {
+    const token = await registerAndLogin("session.detail@test.com", "sessiondetail", "123456");
+
+    const created = await request(app)
+      .post("/api/workouts")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "Detalle", description: "", exerciseIds: [SAMPLE_EXERCISE_ID] })
+      .expect(201);
+
+    const sessionRes = await request(app)
+      .post("/api/workout-sessions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        workoutId: created.body.id,
+        notes: "12/14 series completadas",
+        snapshot: {
+          workoutTitle: "Detalle",
+          completedSets: 12,
+          totalSets: 14,
+          completedExercises: 2,
+          totalExercises: 3,
+          blocks: [
+            {
+              exerciseId: SAMPLE_EXERCISE_ID,
+              exerciseName: "Press banca",
+              sets: [
+                {
+                  done: true,
+                  plannedReps: "10",
+                  plannedWeight: "60",
+                  actualReps: "10",
+                  actualWeight: "60",
+                },
+              ],
+            },
+          ],
+        },
+      })
+      .expect(201);
+
+    const sessionId = sessionRes.body.id as string;
+
+    const detail = await request(app)
+      .get(`/api/workout-sessions/${sessionId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(detail.body.workoutTitle).toBe("Detalle");
+    expect(detail.body.snapshot?.completedSets).toBe(12);
+    expect(detail.body.snapshot?.blocks).toHaveLength(1);
+    expect(detail.body.authorUsername).toBe("sessiondetail");
+  });
+
+  it("allows viewing session linked to a public training post", async () => {
+    const ownerToken = await registerAndLogin("session.post.owner@test.com", "sesspostowner", "123456");
+    const viewerToken = await registerAndLogin("session.post.viewer@test.com", "sesspostviewer", "123456");
+
+    const workout = await request(app)
+      .post("/api/workouts")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ title: "Publico", description: "", exerciseIds: [SAMPLE_EXERCISE_ID] })
+      .expect(201);
+
+    const sessionRes = await request(app)
+      .post("/api/workout-sessions")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ workoutId: workout.body.id, notes: "ok" })
+      .expect(201);
+
+    const sessionId = sessionRes.body.id as string;
+
+    await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({
+        content: "Entreno de hoy",
+        format: "training",
+        sessionId,
+        visibility: "public",
+      })
+      .expect(201);
+
+    const detail = await request(app)
+      .get(`/api/workout-sessions/${sessionId}`)
+      .set("Authorization", `Bearer ${viewerToken}`)
+      .expect(200);
+
+    expect(detail.body.id).toBe(sessionId);
+  });
+
+  it("forbids viewing another users session without access", async () => {
+    const ownerToken = await registerAndLogin("session.private.owner@test.com", "sessprivowner", "123456");
+    const viewerToken = await registerAndLogin("session.private.viewer@test.com", "sessprivviewer", "123456");
+
+    const workout = await request(app)
+      .post("/api/workouts")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ title: "Privado", description: "", exerciseIds: [SAMPLE_EXERCISE_ID] })
+      .expect(201);
+
+    const sessionRes = await request(app)
+      .post("/api/workout-sessions")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ workoutId: workout.body.id })
+      .expect(201);
+
+    const response = await request(app)
+      .get(`/api/workout-sessions/${sessionRes.body.id}`)
+      .set("Authorization", `Bearer ${viewerToken}`);
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe("WORKOUT_SESSION_FORBIDDEN");
+  });
+
   it("prevents deleting another users session", async () => {
     const ownerToken = await registerAndLogin("session.del.owner@test.com", "sessiondelowner", "123456");
     const intruderToken = await registerAndLogin("session.del.bad@test.com", "sessiondelbad", "123456");

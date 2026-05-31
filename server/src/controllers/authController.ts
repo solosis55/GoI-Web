@@ -1,8 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
+import { MulterError } from "multer";
 import { createId, saveStore, store, User } from "../services/store.js";
 import { hashPassword, signAuthToken, verifyPassword } from "../services/auth.js";
 import { sendError } from "../services/http.js";
+import { buildPublicAssetUrl, tryRemoveOldProfileUpload } from "../services/profileUploads.js";
 import { isValidProfileAvatarUrlCandidate } from "../services/postMedia.js";
 import {
   isValidProfileBannerUrl,
@@ -12,6 +14,18 @@ import {
   normalizeWebsiteProfileUrl,
 } from "../services/profileFields.js";
 import { isLengthBetween, normalizeEmail, sanitizeText } from "../services/validation.js";
+import { createProfileImageUploader } from "../middleware/profileImageUpload.js";
+import { canViewFullProfile } from "../services/profileAccess.js";
+import { mapRankedToDiscoverDto } from "../services/discoverDto.js";
+import { parseDiscoverFacet, rankDiscoverForViewer } from "./socialController.js";
+import { checkFollowRateLimit } from "../services/followRateLimit.js";
+import {
+  DEFAULT_PROFILE_SECTIONS,
+  isBlockedBetween,
+  normalizeDefaultPostVisibility,
+  normalizeProfileSections,
+  normalizeProfileVisibility,
+} from "../services/profileVisibility.js";
 
 type AuthPayload = {
   email?: string;
@@ -31,6 +45,10 @@ type UpdateProfilePayload = {
   stravaUrl?: string;
   location?: string;
   profileVisibility?: string;
+  profileSections?: unknown;
+  discoverable?: boolean;
+  requireAuthToView?: boolean;
+  defaultPostVisibility?: string;
   pinnedPostId?: string | null;
 };
 
@@ -149,6 +167,10 @@ export async function register(req: Request, res: Response) {
     stravaUrl: "",
     location: "",
     profileVisibility: "public",
+    profileSections: { ...DEFAULT_PROFILE_SECTIONS },
+    discoverable: true,
+    requireAuthToView: false,
+    defaultPostVisibility: "public",
     pinnedPostId: "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -258,6 +280,10 @@ export function updateProfile(req: Request, res: Response) {
     stravaUrl,
     location,
     profileVisibility,
+    profileSections,
+    discoverable,
+    requireAuthToView,
+    defaultPostVisibility,
     pinnedPostId,
   } = req.body as UpdateProfilePayload;
   const user = store.users.find((item) => item.id === userId);
@@ -305,6 +331,10 @@ export function updateProfile(req: Request, res: Response) {
       );
       return;
     }
+    const prevAvatar = user.avatarUrl;
+    if (prevAvatar !== normalizedAvatarUrl) {
+      tryRemoveOldProfileUpload(prevAvatar, userId, "avatars");
+    }
     user.avatarUrl = normalizedAvatarUrl;
   }
 
@@ -313,6 +343,10 @@ export function updateProfile(req: Request, res: Response) {
     if (b && !isValidProfileBannerUrl(b)) {
       sendError(res, 400, "AUTH_PROFILE_INVALID_INPUT", "banner must be https URL or image data URL (jpeg/png/webp)");
       return;
+    }
+    const prevBanner = user.bannerUrl;
+    if (prevBanner !== b) {
+      tryRemoveOldProfileUpload(prevBanner, userId, "banners");
     }
     user.bannerUrl = b;
   }
@@ -353,12 +387,23 @@ export function updateProfile(req: Request, res: Response) {
   }
 
   if (profileVisibility !== undefined) {
-    const v = sanitizeText(profileVisibility);
-    if (v !== "public" && v !== "followers") {
-      sendError(res, 400, "AUTH_PROFILE_INVALID_INPUT", "profileVisibility must be public or followers");
-      return;
-    }
-    user.profileVisibility = v;
+    user.profileVisibility = normalizeProfileVisibility(sanitizeText(profileVisibility));
+  }
+
+  if (profileSections !== undefined) {
+    user.profileSections = normalizeProfileSections(profileSections);
+  }
+
+  if (discoverable !== undefined) {
+    user.discoverable = Boolean(discoverable);
+  }
+
+  if (requireAuthToView !== undefined) {
+    user.requireAuthToView = Boolean(requireAuthToView);
+  }
+
+  if (defaultPostVisibility !== undefined) {
+    user.defaultPostVisibility = normalizeDefaultPostVisibility(sanitizeText(defaultPostVisibility));
   }
 
   if (pinnedPostId !== undefined) {
@@ -382,6 +427,59 @@ export function updateProfile(req: Request, res: Response) {
   });
 }
 
+export function handleProfileImageMulter(upload: ReturnType<typeof createProfileImageUploader>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    upload(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+      if (err instanceof MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          sendError(res, 413, "PROFILE_IMAGE_TOO_LARGE", "max size is 2 MB");
+          return;
+        }
+        sendError(res, 400, "PROFILE_IMAGE_INVALID", err.message);
+        return;
+      }
+      const msg = err instanceof Error ? err.message : "invalid file";
+      sendError(res, 400, "PROFILE_IMAGE_INVALID", msg);
+    });
+  };
+}
+
+export function uploadProfileAvatarFile(req: Request, res: Response) {
+  const authUserId = String(res.locals.authUserId ?? "");
+  const { userId } = req.params;
+  if (!authUserId || authUserId !== userId) {
+    sendError(res, 403, "AUTH_FORBIDDEN", "forbidden");
+    return;
+  }
+  const file = (req as Request & { file?: { filename: string } }).file;
+  if (!file) {
+    sendError(res, 400, "PROFILE_IMAGE_MISSING", 'expected multipart field "file"');
+    return;
+  }
+  const pathname = `/uploads/avatars/${file.filename}`;
+  res.json({ url: buildPublicAssetUrl(req, pathname) });
+}
+
+export function uploadProfileBannerFile(req: Request, res: Response) {
+  const authUserId = String(res.locals.authUserId ?? "");
+  const { userId } = req.params;
+  if (!authUserId || authUserId !== userId) {
+    sendError(res, 403, "AUTH_FORBIDDEN", "forbidden");
+    return;
+  }
+  const file = (req as Request & { file?: { filename: string } }).file;
+  if (!file) {
+    sendError(res, 400, "PROFILE_IMAGE_MISSING", 'expected multipart field "file"');
+    return;
+  }
+  const pathname = `/uploads/banners/${file.filename}`;
+  res.json({ url: buildPublicAssetUrl(req, pathname) });
+}
+
 export function listUsers(req: Request, res: Response) {
   const currentUserId = String(res.locals.authUserId ?? "");
   if (!currentUserId) {
@@ -403,10 +501,38 @@ export function listUsers(req: Request, res: Response) {
   res.json({ users });
 }
 
+export function discoverUsers(req: Request, res: Response) {
+  const currentUserId = String(res.locals.authUserId ?? "");
+  if (!currentUserId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(1, limitRaw), 48) : 24;
+  const offsetRaw = Number(req.query.offset);
+  const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.floor(offsetRaw)) : 0;
+
+  const facetRaw = typeof req.query.facet === "string" ? req.query.facet : "all";
+  const facet = parseDiscoverFacet(facetRaw);
+
+  const ranked = rankDiscoverForViewer(currentUserId, facet);
+  const page = ranked.slice(offset, offset + limit);
+  const nextOffset = offset + limit < ranked.length ? offset + limit : null;
+
+  const users = page.map((row) => mapRankedToDiscoverDto(row, currentUserId));
+
+  res.json({ users, nextOffset, total: ranked.length, facet });
+}
+
 export function getFollowing(req: Request, res: Response) {
   const { userId } = req.params;
   const authUserId = String(res.locals.authUserId ?? "");
-  if (!authUserId || authUserId !== userId) {
+  if (!authUserId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  if (authUserId !== userId && !canViewFullProfile(authUserId, userId)) {
     sendError(res, 403, "AUTH_FORBIDDEN", "forbidden");
     return;
   }
@@ -420,12 +546,16 @@ export function getFollowing(req: Request, res: Response) {
 export function getFollowers(req: Request, res: Response) {
   const { userId } = req.params;
   const authUserId = String(res.locals.authUserId ?? "");
-  if (!authUserId || authUserId !== userId) {
+  if (!authUserId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  if (authUserId !== userId && !canViewFullProfile(authUserId, userId)) {
     sendError(res, 403, "AUTH_FORBIDDEN", "forbidden");
     return;
   }
   const followerIds = store.follows
-    .filter((follow) => follow.followingId === userId)
+    .filter((follow) => follow.followingId === userId && follow.status !== "pending")
     .map((follow) => follow.followerId);
   res.json({ followerIds });
 }
@@ -449,22 +579,186 @@ export function toggleFollow(req: Request, res: Response) {
     return;
   }
 
+  if (isBlockedBetween(followerId, targetUserId)) {
+    sendError(res, 403, "AUTH_FORBIDDEN", "cannot follow this user");
+    return;
+  }
+
+  const target = store.users.find((u) => u.id === targetUserId)!;
+  if (target.profileVisibility === "private") {
+    sendError(res, 403, "AUTH_CANNOT_FOLLOW_PRIVATE", "profile is private");
+    return;
+  }
+
   const existingIndex = store.follows.findIndex(
-    (follow) => follow.followerId === followerId && follow.followingId === targetUserId
+    (follow) => follow.followerId === followerId && follow.followingId === targetUserId,
   );
   if (existingIndex >= 0) {
     store.follows.splice(existingIndex, 1);
     saveStore();
-    res.json({ following: false });
+    res.json({ following: false, pending: false, status: "none" });
     return;
   }
 
+  if (!checkFollowRateLimit(followerId)) {
+    sendError(res, 429, "AUTH_RATE_LIMIT", "too many follow actions, try later");
+    return;
+  }
+
+  const needsApproval = target.profileVisibility === "request";
   store.follows.push({
     id: createId(),
     followerId,
     followingId: targetUserId,
     createdAt: new Date().toISOString(),
+    status: needsApproval ? "pending" : "active",
   });
   saveStore();
-  res.json({ following: true });
+  if (needsApproval) {
+    res.json({ following: false, pending: true, status: "pending" });
+    return;
+  }
+  res.json({ following: true, pending: false, status: "active" });
+}
+
+export function respondFollowRequest(req: Request, res: Response) {
+  const ownerId = String(res.locals.authUserId ?? "");
+  const requesterId = String(req.params.requesterId ?? "");
+  const action = sanitizeText((req.body as { action?: string }).action);
+
+  if (!ownerId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  if (action !== "accept" && action !== "reject") {
+    sendError(res, 400, "AUTH_INVALID_INPUT", "action must be accept or reject");
+    return;
+  }
+
+  const idx = store.follows.findIndex(
+    (f) => f.followerId === requesterId && f.followingId === ownerId && f.status === "pending",
+  );
+  if (idx < 0) {
+    sendError(res, 404, "AUTH_FOLLOW_REQUEST_NOT_FOUND", "request not found");
+    return;
+  }
+
+  if (action === "reject") {
+    store.follows.splice(idx, 1);
+  } else {
+    store.follows[idx]!.status = "active";
+  }
+  saveStore();
+  res.json({ ok: true, action });
+}
+
+export function toggleBlockUser(req: Request, res: Response) {
+  const blockerId = String(res.locals.authUserId ?? "");
+  const blockedId = String(req.params.targetUserId ?? "");
+  if (!blockerId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  if (blockerId === blockedId) {
+    sendError(res, 400, "AUTH_INVALID_INPUT", "cannot block yourself");
+    return;
+  }
+  if (!store.users.some((u) => u.id === blockedId)) {
+    sendError(res, 404, "AUTH_USER_NOT_FOUND", "user not found");
+    return;
+  }
+
+  const idx = store.userBlocks.findIndex((b) => b.blockerId === blockerId && b.blockedId === blockedId);
+  if (idx >= 0) {
+    store.userBlocks.splice(idx, 1);
+    saveStore();
+    res.json({ blocked: false });
+    return;
+  }
+
+  store.follows = store.follows.filter(
+    (f) =>
+      !(
+        (f.followerId === blockerId && f.followingId === blockedId) ||
+        (f.followerId === blockedId && f.followingId === blockerId)
+      ),
+  );
+
+  store.userBlocks.push({
+    id: createId(),
+    blockerId,
+    blockedId,
+    createdAt: new Date().toISOString(),
+  });
+  saveStore();
+  res.json({ blocked: true });
+}
+
+export function listPendingFollowRequests(req: Request, res: Response) {
+  const userId = String(res.locals.authUserId ?? "");
+  if (!userId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  const requests = store.follows
+    .filter((f) => f.followingId === userId && f.status === "pending")
+    .map((f) => {
+      const u = store.users.find((user) => user.id === f.followerId);
+      return {
+        requesterId: f.followerId,
+        username: u?.username ?? "Usuario",
+        avatarUrl: u?.avatarUrl ?? "",
+        createdAt: f.createdAt,
+      };
+    });
+  res.json({ requests });
+}
+
+export function listSentFollowRequests(req: Request, res: Response) {
+  const userId = String(res.locals.authUserId ?? "");
+  if (!userId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  const requests = store.follows
+    .filter((f) => f.followerId === userId && f.status === "pending")
+    .map((f) => {
+      const u = store.users.find((user) => user.id === f.followingId);
+      return {
+        targetUserId: f.followingId,
+        username: u?.username ?? "Usuario",
+        avatarUrl: u?.avatarUrl ?? "",
+        createdAt: f.createdAt,
+      };
+    });
+  res.json({ requests });
+}
+
+export function listBlockedUsers(req: Request, res: Response) {
+  const userId = String(res.locals.authUserId ?? "");
+  if (!userId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  const blockedIds = store.userBlocks.filter((b) => b.blockerId === userId).map((b) => b.blockedId);
+  res.json({ blockedIds });
+}
+
+export function listBlockedUsersPreviews(req: Request, res: Response) {
+  const userId = String(res.locals.authUserId ?? "");
+  if (!userId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+  const users = store.userBlocks
+    .filter((b) => b.blockerId === userId)
+    .map((b) => {
+      const u = store.users.find((user) => user.id === b.blockedId);
+      return {
+        id: b.blockedId,
+        username: u?.username ?? "Usuario",
+        avatarUrl: u?.avatarUrl ?? "",
+      };
+    });
+  res.json({ users });
 }

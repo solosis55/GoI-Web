@@ -30,8 +30,8 @@
 
 ### Marca (`src/components/branding`)
 - `GoISidebarBadge`
-  - Props: `subtitle`, `description?`, opcional **`showDescriptionOnMobile`**, **`presentation`** (`"compact"` | **`hero`**`; defecto **`compact`**), **`heroHalo`** (solo con **`hero`**: halo **conic-gradient** rotatorio detrás del círculo; clase **`goi-hero-halo`** en **`index.css`**).
-  - Uso: pantalla **auth** centrada sobre el card (logo circular, GoI); **`hero`** + **`heroHalo`** lo usa **`LoginHeroBrand`**.
+  - Props: `subtitle`, `description?`, opcional **`showDescriptionOnMobile`**, **`presentation`** (`"compact"` | **`hero`**`; defecto **`compact`**), **`heroHalo`** (solo con **`hero`**: halo **conic-gradient** rotatorio detrás del círculo; clase **`goi-hero-halo`** en **`index.css`**, nodos **188×188** px y **236×236** px en `sm`), **`heroHaloRef`**.
+  - Uso: pantalla **auth** / splash (`LoginHeroBrand`) y sidebar compacto. La imagen del logo viene de **`brandingLogoSrc(theme)`** (`src/utils/brandingLogo.ts`: Legacy = mark PNG, otros temas = lockups en `public/branding/`). En **`hero` + halo**: imagen **`absolute inset-0`**, **`object-cover`**, **`scale`** ~1.22 / 1.14 (`sm`), **`light:mix-blend-multiply`** en temas claros. En **`compact`**: **`object-contain`** en ~72% del anillo, sin halo.
 - `LoginHeroBrand`
   - Props: mismos textos que **`GoISidebarBadge`** (`subtitle`, `description?`, **`showDescriptionOnMobile`**), **`onDismissComplete`** al terminar la salida del logo (~1 s).
   - Uso: solo **`App.tsx`** invitado — primero **solo** marca centrada (`splash`); al clic desaparece con transición larga y el padre muestra **`AuthPage`** con **`auth-form-reveal`**.
@@ -101,11 +101,19 @@
   - Props: `mode`, `onChangeMode`, `compact?` (pills `text-xs` y menos padding; pestañas centradas con `justify-center`).
   - Uso: alternar feed entre "Todos" y "Seguidos" (en historias se usa **`compact`**); segmentos con altura mínima táctil (~44 px).
 - `UserSummaryCard`
-  - Props: `username`, `myPostsCount`.
+  - Props: `username`, `myPostsCount`, opcional **`onGoToProfile`** (callback al pulsar **Ir al perfil**; con sesión propia **`App`** pasa navegación a pestaña Perfil en lugar de modal vacío).
   - Uso: resumen de cuenta en sidebar del feed.
 - `FeedSidebar`
-  - Props: `username`, `myPostsCount`, `suggestedUsers`, `followingIds`, `onToggleFollow`, `onViewProfile`, `className?`.
-  - Uso: lateral reutilizable del feed (resumen de cuenta + sugerencias + acciones de seguir/perfil). En móvil se renderiza en la columna principal; en desktop se mantiene en el lateral derecho.
+  - Props: `username`, `myPostsCount`, `suggestedUsers`, `followingIds`, `onToggleFollow`, `onViewProfile`, opcional **`onGoToProfile`**, `className?`.
+  - Uso: lateral reutilizable del feed (resumen de cuenta + sugerencias + acciones de seguir/perfil). En móvil se renderiza en la columna principal; en desktop se mantiene en el lateral derecho. **`onGoToProfile`** se reenvía a **`UserSummaryCard`**.
+
+### Estadísticas (`src/components/stats`)
+- `MuscleBodyGlowMapBasic`
+  - Props: `hits` (conteos por eje del octágono muscular), `mapPeriod`, `className?`, entre otras según implementación.
+  - Uso: **`StatisticsPersonalTab`** — mapa corporal frente/espalda con intensidad por zona; IDs de paths SVG enlazados a ejes vía **`src/utils/muscleBodyMapSvgZones.ts`** (`MUSCLE_MAP_AXIS_TO_SVG_IDS`, `MUSCLE_MAP_PATH_FALLBACK_LABEL`).
+- `MuscleBodyGlowMap`
+  - Props: `hits`, `className?`.
+  - Uso: variante de mapa muscular con siluetas SVG detalladas (misma familia de datos que el octágono).
 
 ### Workouts (`src/components/workouts`)
 - `WorkoutForm`
@@ -134,4 +142,4 @@
 
 ## Pendientes
 
-- [ ] (Opcional) seguir extrayendo bloques de `FeedPage` si crece la complejidad del timeline principal.
+- [ ] (Opcional) seguir extrayendo bloques de `FeedPage` si crece la complejidad del timeline principal (el sidebar ya está en **`FeedSidebar`**).

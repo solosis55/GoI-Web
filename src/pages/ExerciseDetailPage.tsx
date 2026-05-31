@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getExercise } from "../api/exercisesApi";
+import { ExerciseDetailStatsPlaceholder } from "../components/exercises/ExerciseDetailStatsPlaceholder";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { StatusMessage } from "../components/ui/StatusMessage";
@@ -111,7 +112,7 @@ export function ExerciseDetailPage({
             {loading ? "…" : titleShort}
           </span>
         </nav>
-        <p className="text-xs font-medium uppercase tracking-wider text-goi-gold-dim">Ficha del ejercicio</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-goi-gold-dim">Ficha del movimiento</p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight text-neutral-100 light:text-zinc-900 sm:text-2xl">
           {loading ? "Cargando…" : exercise?.name ?? "Ejercicio"}
         </h1>
@@ -146,7 +147,7 @@ export function ExerciseDetailPage({
 
             {exercise.equipmentTags && exercise.equipmentTags.length > 0 ? (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Material</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Variantes de material</p>
                 <ul className="mt-2 flex list-none flex-wrap gap-2 p-0">
                   {exercise.equipmentTags.map((slug) => (
                     <li key={slug}>
@@ -158,6 +159,8 @@ export function ExerciseDetailPage({
                 </ul>
               </div>
             ) : null}
+
+            <ExerciseDetailStatsPlaceholder />
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Grupos musculares</p>

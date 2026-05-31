@@ -1,14 +1,34 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { updateProfile } from "../../api/authApi";
+import { updateProfile, uploadProfileAvatarFile, uploadProfileBannerFile } from "../../api/authApi";
 import type { SafeUser } from "../../types/auth";
-import { compressImageFileToDataUrlSafe } from "../../utils/postImages";
+import { compressImageFileToJpegFile } from "../../utils/postImages";
 import { getErrorMessage } from "../../utils/errorMessages";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 
 const DATA_OR_HTTP =
   /^(https?:\/\/|data:image\/(jpeg|jpg|png|webp);base64,)/i;
+
+function isRenderableImageSrc(url: string): boolean {
+  const u = url.trim();
+  if (!u) return false;
+  return (
+    /^https?:\/\//i.test(u) ||
+    /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(u) ||
+    /^blob:/i.test(u)
+  );
+}
+
+function revokeIfObjectUrl(url: string | undefined) {
+  if (url && url.startsWith("blob:")) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 type ProfileAvatarPanelProps = {
   open: boolean;
@@ -39,18 +59,33 @@ export function ProfileAvatarPanel({
   const bannerFileRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<string | undefined>(undefined);
   const [stagedBanner, setStagedBanner] = useState<string | undefined>(undefined);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [bannerPreviewUrl, setBannerPreviewUrl] = useState<string | null>(null);
+  const [avatarPickedFile, setAvatarPickedFile] = useState<File | null>(null);
+  const [bannerPickedFile, setBannerPickedFile] = useState<File | null>(null);
   const [linkDraft, setLinkDraft] = useState("");
   const [bannerLinkDraft, setBannerLinkDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const displayUrl = staged !== undefined ? staged : avatarUrl;
-  const displayBanner = stagedBanner !== undefined ? stagedBanner : bannerUrl;
+  const displayUrl = (avatarPreviewUrl ?? (staged !== undefined ? staged : avatarUrl)) || undefined;
+  const displayBanner =
+    bannerPreviewUrl ?? (stagedBanner !== undefined ? stagedBanner : bannerUrl);
 
   useEffect(() => {
     if (!open) return;
     setStaged(undefined);
     setStagedBanner(undefined);
+    setAvatarPickedFile(null);
+    setBannerPickedFile(null);
+    setAvatarPreviewUrl((prev) => {
+      revokeIfObjectUrl(prev ?? undefined);
+      return null;
+    });
+    setBannerPreviewUrl((prev) => {
+      revokeIfObjectUrl(prev ?? undefined);
+      return null;
+    });
     setLinkDraft("");
     setBannerLinkDraft("");
     setErr("");
@@ -83,8 +118,12 @@ export function ProfileAvatarPanel({
     setErr("");
     setBusy(true);
     try {
-      const dataUrl = await compressImageFileToDataUrlSafe(file);
-      setStaged(dataUrl);
+      setStaged(undefined);
+      setAvatarPickedFile(file);
+      setAvatarPreviewUrl((prev) => {
+        revokeIfObjectUrl(prev ?? undefined);
+        return URL.createObjectURL(file);
+      });
     } catch {
       setErr("No se pudo leer la imagen.");
     } finally {
@@ -103,8 +142,12 @@ export function ProfileAvatarPanel({
     setErr("");
     setBusy(true);
     try {
-      const dataUrl = await compressImageFileToDataUrlSafe(file);
-      setStagedBanner(dataUrl);
+      setStagedBanner(undefined);
+      setBannerPickedFile(file);
+      setBannerPreviewUrl((prev) => {
+        revokeIfObjectUrl(prev ?? undefined);
+        return URL.createObjectURL(file);
+      });
     } catch {
       setErr("No se pudo leer la imagen de cabecera.");
     } finally {
@@ -116,8 +159,37 @@ export function ProfileAvatarPanel({
   async function handleSavePhoto(e?: FormEvent) {
     e?.preventDefault();
     setErr("");
-    const nextAvatar = staged !== undefined ? staged : avatarUrl;
-    const nextBanner = (stagedBanner !== undefined ? stagedBanner : bannerUrl).trim();
+    let nextAvatar = avatarUrl;
+    if (avatarPickedFile) {
+      setBusy(true);
+      try {
+        const jpeg = await compressImageFileToJpegFile(avatarPickedFile, "avatar.jpg");
+        nextAvatar = await uploadProfileAvatarFile(userId, jpeg);
+      } catch (upErr) {
+        setErr(getErrorMessage(upErr, "No se pudo subir la foto"));
+        setBusy(false);
+        return;
+      } finally {
+        setBusy(false);
+      }
+    } else if (staged !== undefined) {
+      nextAvatar = staged;
+    }
+
+    let nextBanner = (stagedBanner !== undefined ? stagedBanner : bannerUrl).trim();
+    if (bannerPickedFile) {
+      setBusy(true);
+      try {
+        const jpeg = await compressImageFileToJpegFile(bannerPickedFile, "banner.jpg");
+        nextBanner = await uploadProfileBannerFile(userId, jpeg);
+      } catch (upErr) {
+        setErr(getErrorMessage(upErr, "No se pudo subir la cabecera"));
+        setBusy(false);
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
 
     if (nextAvatar && !DATA_OR_HTTP.test(nextAvatar)) {
       setErr("La foto debe ser un enlace https o una imagen del equipo.");
@@ -162,6 +234,11 @@ export function ProfileAvatarPanel({
     }
     setErr("");
     setStaged(t);
+    setAvatarPickedFile(null);
+    setAvatarPreviewUrl((prev) => {
+      revokeIfObjectUrl(prev ?? undefined);
+      return null;
+    });
   }
 
   function applyBannerLink() {
@@ -176,6 +253,11 @@ export function ProfileAvatarPanel({
     }
     setErr("");
     setStagedBanner(t);
+    setBannerPickedFile(null);
+    setBannerPreviewUrl((prev) => {
+      revokeIfObjectUrl(prev ?? undefined);
+      return null;
+    });
   }
 
   if (!open) return null;
@@ -208,14 +290,13 @@ export function ProfileAvatarPanel({
           Foto de perfil e imagen de cabecera
         </h2>
         <p className="mb-3 text-xs text-neutral-500">
-          Elige imágenes en este equipo (se comprimen) o enlaces públicos. Ambas se guardan al pulsar Guardar.
+          Elige imágenes en este equipo (se comprimen y se suben al servidor) o enlaces públicos. Al guardar, el perfil
+          guarda solo la URL del fichero, no una imagen enorme en el JSON.
         </p>
 
         <div className="mb-4 overflow-hidden rounded-lg border border-neutral-700/80 bg-black/30 light:border-zinc-200">
           <div className="relative h-24 w-full sm:h-28">
-            {displayBanner.trim() &&
-            (/^https?:\/\//i.test(displayBanner) ||
-              /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(displayBanner)) ? (
+            {isRenderableImageSrc(displayBanner) ? (
               <img src={displayBanner} alt="" className="absolute inset-0 size-full object-cover" decoding="async" />
             ) : (
               <div
@@ -258,7 +339,14 @@ export function ProfileAvatarPanel({
                 variant="danger"
                 disabled={busy || !displayUrl}
                 className="!py-2 !text-xs"
-                onClick={() => setStaged("")}
+                onClick={() => {
+                  setStaged("");
+                  setAvatarPickedFile(null);
+                  setAvatarPreviewUrl((prev) => {
+                    revokeIfObjectUrl(prev ?? undefined);
+                    return null;
+                  });
+                }}
               >
                 Quitar foto
               </Button>
@@ -298,7 +386,14 @@ export function ProfileAvatarPanel({
                 variant="danger"
                 disabled={busy || !displayBanner.trim()}
                 className="!py-2 !text-xs"
-                onClick={() => setStagedBanner("")}
+                onClick={() => {
+                  setStagedBanner("");
+                  setBannerPickedFile(null);
+                  setBannerPreviewUrl((prev) => {
+                    revokeIfObjectUrl(prev ?? undefined);
+                    return null;
+                  });
+                }}
               >
                 Quitar cabecera
               </Button>

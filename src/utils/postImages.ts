@@ -96,6 +96,53 @@ export async function compressImageFileToDataUrlSafe(file: File): Promise<string
   }
 }
 
+function canvasToJpegBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("toBlob falló"));
+      },
+      "image/jpeg",
+      JPEG_QUALITY,
+    );
+  });
+}
+
+/**
+ * Misma compresión que `compressImageFileToDataUrlSafe`, pero devuelve un `File` JPEG
+ * para subirlo al servidor sin meter base64 en el JSON del perfil.
+ */
+export async function compressImageFileToJpegFile(file: File, filename = "photo.jpg"): Promise<File> {
+  const jpegName =
+    filename.toLowerCase().endsWith(".jpg") || filename.toLowerCase().endsWith(".jpeg")
+      ? filename
+      : `${filename.replace(/\.[^.]+$/, "") || "photo"}.jpg`;
+  try {
+    const bitmap = await createImageBitmap(file);
+    try {
+      const { width, height } = bitmap;
+      const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+      const tw = Math.max(1, Math.round(width * scale));
+      const th = Math.max(1, Math.round(height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = tw;
+      canvas.height = th;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas no disponible");
+      ctx.drawImage(bitmap, 0, 0, tw, th);
+      const blob = await canvasToJpegBlob(canvas);
+      return new File([blob], jpegName, { type: "image/jpeg" });
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    const dataUrl = await compressImageFileToDataUrlSafe(file);
+    const blob = await fetch(dataUrl).then((r) => r.blob());
+    return new File([blob], jpegName, { type: "image/jpeg" });
+  }
+}
+
 export async function compressManyStorySlides(
   incoming: FileList | File[],
   alreadyCount: number,

@@ -1,3 +1,5 @@
+export type PostFormat = "standard" | "training";
+
 export type PostMediaItem = { type: "image"; url: string };
 
 export type Post = {
@@ -7,6 +9,7 @@ export type Post = {
   authorAvatarUrl: string;
   content: string;
   media?: PostMediaItem[];
+  sessionId: string | null;
   workoutId: string | null;
   visibility: "public" | "followers" | "private";
   createdAt: string;
@@ -30,7 +33,10 @@ export type PostComment = {
 
 export type CreatePostInput = {
   content: string;
-  workoutId: string | null;
+  format?: PostFormat;
+  sessionId?: string | null;
+  /** @deprecated Preferir sessionId */
+  workoutId?: string | null;
   visibility?: "public" | "followers" | "private";
   /** Max 4; JPEG/PNG/WebP en base64 tras comprimir en el cliente. */
   media?: PostMediaItem[];
