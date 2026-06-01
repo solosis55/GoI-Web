@@ -1,4 +1,10 @@
-import { API_BASE_URL, ApiError, apiFetch, AUTH_EXPIRED_EVENT, getStoredToken } from "./client";
+import {
+  ApiError,
+  AUTH_EXPIRED_EVENT,
+  API_BASE_URL,
+  apiFetch,
+  getStoredToken,
+} from "./client";
 import type {
   AuthResponse,
   DiscoverUser,
@@ -40,11 +46,11 @@ export function resetPasswordWithToken(input: ResetPasswordInput) {
 }
 
 export function getProfile(userId: string) {
-  return apiFetch<{ user: ProfileUser }>(`/auth/profile/${userId}`);
+  return apiFetch<{ user: ProfileUser }>(`/auth/profile/${encodeURIComponent(userId)}`);
 }
 
 export function updateProfile(userId: string, input: UpdateProfileInput) {
-  return apiFetch<{ message: string; user: SafeUser }>(`/auth/profile/${userId}`, {
+  return apiFetch<{ message: string; user: SafeUser }>(`/auth/profile/${encodeURIComponent(userId)}`, {
     method: "PUT",
     body: JSON.stringify(input),
   });
@@ -108,6 +114,12 @@ export function getUsers() {
   return apiFetch<{ users: DiscoverUser[] }>("/auth/users");
 }
 
+export type ToggleFollowResponse = {
+  following: boolean;
+  pending?: boolean;
+  status?: "none" | "pending" | "active";
+};
+
 export function getFollowing(userId: string) {
   return apiFetch<{ followingIds: string[] }>(`/auth/following/${encodeURIComponent(userId)}`);
 }
@@ -117,7 +129,7 @@ export function getFollowers(userId: string) {
 }
 
 export function toggleFollow(targetUserId: string) {
-  return apiFetch<{ following: boolean }>(`/auth/follow/${targetUserId}`, {
+  return apiFetch<ToggleFollowResponse>(`/auth/follow/${encodeURIComponent(targetUserId)}`, {
     method: "POST",
   });
 }

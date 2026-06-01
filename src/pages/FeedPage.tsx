@@ -8,7 +8,7 @@ import {
   createPost,
   deletePost,
   getNotifications,
-  getPosts,
+  getFeedPage,
   toggleLike,
   updatePost,
 } from "../api/postsApi";
@@ -597,37 +597,73 @@ export function FeedPage({
     setMessage("");
     try {
       const [
-        postsResponse,
-        workoutsResponse,
-        usersResponse,
-        followingResponse,
-        followersResponse,
-        sessionsResponse,
-        exercisesResponse,
-        notifResponse,
-        storiesRes,
-      ] = await Promise.all([
-        getPosts(),
+        postsResult,
+        workoutsResult,
+        usersResult,
+        followingResult,
+        followersResult,
+        sessionsResult,
+        exercisesResult,
+        notifResult,
+        storiesResult,
+      ] = await Promise.allSettled([
+        getFeedPage("all", 40),
         getWorkouts(),
         getUsers(),
         getFollowing(userId),
-        getFollowers(userId).catch(() => ({ followerIds: [] as string[] })),
-        getWorkoutSessions().catch(() => [] as WorkoutSessionWithTitle[]),
-        getExercises().catch(() => [] as Exercise[]),
-        getNotifications().catch(() => ({ notifications: [] as FeedNotification[], unreadCount: 0 })),
-        getStories().catch(() => ({ authors: [] as FeedStoryAuthor[] })),
+        getFollowers(userId),
+        getWorkoutSessions(),
+        getExercises(),
+        getNotifications(),
+        getStories(),
       ]);
-      setPosts(postsResponse);
-      setWorkoutSessions(Array.isArray(sessionsResponse) ? sessionsResponse : []);
-      setExercisesCatalog(Array.isArray(exercisesResponse) ? exercisesResponse : []);
-      setFollowerIds(followersResponse.followerIds ?? []);
-      setStoryAuthorsFromApi(storiesRes.authors ?? []);
-      setNotifications(notifResponse.notifications ?? []);
-      setUnreadCount(notifResponse.unreadCount ?? 0);
-      const mine = workoutsResponse.filter((workout) => workout.userId === userId);
-      setWorkouts(mine);
-      setDiscoverUsers(usersResponse.users);
-      setFollowingIds(followingResponse.followingIds);
+
+      if (postsResult.status === "fulfilled") {
+        setPosts(
+          postsResult.value.items
+            .filter((item) => item.kind === "post")
+            .map((item) => item.post),
+        );
+      } else {
+        setPosts([]);
+        setError(
+          getErrorMessage(postsResult.reason, "No se pudieron cargar las publicaciones (Goi Server / Neon)."),
+        );
+      }
+
+      if (workoutsResult.status === "fulfilled") {
+        const mine = workoutsResult.value.filter((workout) => workout.userId === userId);
+        setWorkouts(mine);
+      }
+
+      if (usersResult.status === "fulfilled") {
+        setDiscoverUsers(usersResult.value.users);
+      }
+
+      if (followingResult.status === "fulfilled") {
+        setFollowingIds(followingResult.value.followingIds);
+      }
+
+      if (followersResult.status === "fulfilled") {
+        setFollowerIds(followersResult.value.followerIds ?? []);
+      }
+
+      if (sessionsResult.status === "fulfilled") {
+        setWorkoutSessions(Array.isArray(sessionsResult.value) ? sessionsResult.value : []);
+      }
+
+      if (exercisesResult.status === "fulfilled") {
+        setExercisesCatalog(Array.isArray(exercisesResult.value) ? exercisesResult.value : []);
+      }
+
+      if (notifResult.status === "fulfilled") {
+        setNotifications(notifResult.value.notifications ?? []);
+        setUnreadCount(notifResult.value.unreadCount ?? 0);
+      }
+
+      if (storiesResult.status === "fulfilled") {
+        setStoryAuthorsFromApi(storiesResult.value.authors ?? []);
+      }
     } catch (loadError) {
       setError(getErrorMessage(loadError, "No se pudo cargar el feed"));
     } finally {

@@ -8,6 +8,7 @@ export type Post = {
   authorUsername: string;
   authorAvatarUrl: string;
   content: string;
+  format?: PostFormat;
   media?: PostMediaItem[];
   sessionId: string | null;
   workoutId: string | null;

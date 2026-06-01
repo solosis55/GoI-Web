@@ -11,6 +11,7 @@ import { visibilityBadgeClasses } from "../../utils/visibilityBadgeClasses";
 import { formatPostAbsolute, formatPostRelative } from "../../utils/feedPostDate";
 import { PostFeedText } from "./PostFeedText";
 import { FeedPostOverflowMenu } from "./FeedPostOverflowMenu";
+import { usePostMediaHydration } from "../../hooks/usePostMediaHydration";
 
 type PostItemProps = {
   post: Post;
@@ -76,6 +77,7 @@ export function PostItem({
   onMuteAuthor,
   onReport,
 }: PostItemProps) {
+  const displayPost = usePostMediaHydration(post);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [editVisibility, setEditVisibility] = useState<"public" | "followers" | "private">(post.visibility ?? "public");
@@ -127,7 +129,7 @@ export function PostItem({
     if (commentsOpen) setComposerExpanded(true);
   }, [commentsOpen]);
 
-  const hasMedia = (post.media?.length ?? 0) > 0;
+  const hasMedia = (displayPost.media?.length ?? 0) > 0;
   const showComposerMobile =
     composerExpanded || commentValue.trim().length > 0;
 
@@ -246,7 +248,7 @@ export function PostItem({
       </div>
 
       {!editing && hasMedia ? (
-        <PostMediaGallery layout="hero" media={post.media ?? []} feedInteractive />
+        <PostMediaGallery layout="hero" media={displayPost.media ?? []} feedInteractive />
       ) : null}
 
       <div
@@ -263,7 +265,9 @@ export function PostItem({
               onChange={(event) => setEditContent(event.target.value)}
               placeholder="Texto opcional si hay fotos (máx. 280 caracteres)."
             />
-            {post.media && post.media.length > 0 ? <PostMediaGallery media={post.media} layout="inline" /> : null}
+            {displayPost.media && displayPost.media.length > 0 ? (
+              <PostMediaGallery media={displayPost.media} layout="inline" />
+            ) : null}
             <div className="flex flex-wrap items-center gap-2 max-[479px]:grid max-[479px]:grid-cols-1">
               <select
                 className="goi-field max-w-[180px] max-[479px]:max-w-none"
