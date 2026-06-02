@@ -106,6 +106,16 @@ export async function getPostsByUser(userId: string) {
   return page.posts;
 }
 
+export async function getPostsByIds(ids: string[]): Promise<Post[]> {
+  if (ids.length === 0) return [];
+  const sp = new URLSearchParams();
+  sp.set("ids", ids.slice(0, 50).join(","));
+  const res = await apiFetch<{ posts: Post[] }>(`/posts/by-ids?${sp.toString()}`, {
+    timeoutMs: POSTS_FETCH_TIMEOUT_MS,
+  });
+  return Array.isArray(res.posts) ? res.posts.map(normalizePost) : [];
+}
+
 export async function getPostById(postId: string): Promise<Post | null> {
   try {
     return await apiFetch<Post>(`/posts/${encodeURIComponent(postId)}`).then(normalizePost);

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { getFollowers, getFollowing, getProfile, getUsers, updateProfile } from "../api/authApi";
 import {
   deletePost,
-  getPosts,
+  getPostsByIds,
   getPostsByUserPage,
   PROFILE_POSTS_PAGE_SIZE,
   updatePost as updatePostApi,
@@ -202,15 +202,22 @@ export function ProfilePage({
     !myPostsLoadingMore;
   const profilePostsLoadMoreRef = useNearViewport(() => void loadMoreMyPosts(), minePostsInfiniteEnabled);
 
-  const loadTimelinePosts = useCallback(async () => {
+  const loadSavedPosts = useCallback(async () => {
     if (!userId) return;
     setTimelineLoading(true);
     setTimelineError("");
     try {
-      const all = await getPosts();
-      setTimelinePosts(all);
+      const ids = loadSavedPostIds(userId);
+      if (ids.length === 0) {
+        setTimelinePosts([]);
+        return;
+      }
+      const posts = await getPostsByIds(ids);
+      const byId = new Map(posts.map((p) => [p.id, p]));
+      const ordered = ids.map((id) => byId.get(id)).filter((p): p is Post => Boolean(p));
+      setTimelinePosts(ordered);
     } catch (e) {
-      setTimelineError(getErrorMessage(e, "No se pudieron cargar el listado para guardados"));
+      setTimelineError(getErrorMessage(e, "No se pudieron cargar los guardados"));
     } finally {
       setTimelineLoading(false);
     }
@@ -225,17 +232,17 @@ export function ProfilePage({
   }, [userId]);
 
   useEffect(() => {
-    if (profileTab !== "posts" || !userId) return;
-    void loadTimelinePosts();
-  }, [profileTab, userId, loadTimelinePosts]);
+    if (profileTab !== "posts" || postsSubTab !== "saved" || !userId) return;
+    void loadSavedPosts();
+  }, [profileTab, postsSubTab, userId, loadSavedPosts]);
 
   useEffect(() => {
-    if (profileTab !== "posts" || !userId) return;
+    if (profileTab !== "posts" || postsSubTab !== "saved" || !userId) return;
     function onWinFocus() {
-      void loadTimelinePosts();
+      void loadSavedPosts();
     }
     function onVisibility() {
-      if (document.visibilityState === "visible") void loadTimelinePosts();
+      if (document.visibilityState === "visible") void loadSavedPosts();
     }
     window.addEventListener("focus", onWinFocus);
     document.addEventListener("visibilitychange", onVisibility);
@@ -243,7 +250,7 @@ export function ProfilePage({
       window.removeEventListener("focus", onWinFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [profileTab, userId, loadTimelinePosts]);
+  }, [profileTab, postsSubTab, userId, loadSavedPosts]);
 
   function refreshSavedLocal() {
     if (!userId) return;
