@@ -714,36 +714,6 @@ export function listPendingFollowRequests(req: Request, res: Response) {
   res.json({ requests });
 }
 
-export function listSentFollowRequests(req: Request, res: Response) {
-  const userId = String(res.locals.authUserId ?? "");
-  if (!userId) {
-    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
-    return;
-  }
-  const requests = store.follows
-    .filter((f) => f.followerId === userId && f.status === "pending")
-    .map((f) => {
-      const u = store.users.find((user) => user.id === f.followingId);
-      return {
-        targetUserId: f.followingId,
-        username: u?.username ?? "Usuario",
-        avatarUrl: u?.avatarUrl ?? "",
-        createdAt: f.createdAt,
-      };
-    });
-  res.json({ requests });
-}
-
-export function listBlockedUsers(req: Request, res: Response) {
-  const userId = String(res.locals.authUserId ?? "");
-  if (!userId) {
-    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
-    return;
-  }
-  const blockedIds = store.userBlocks.filter((b) => b.blockerId === userId).map((b) => b.blockedId);
-  res.json({ blockedIds });
-}
-
 export function listBlockedUsersPreviews(req: Request, res: Response) {
   const userId = String(res.locals.authUserId ?? "");
   if (!userId) {

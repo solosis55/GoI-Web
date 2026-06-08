@@ -197,19 +197,25 @@ describe("posts security flow", () => {
       .send({ content: "private post", visibility: "private", workoutId: null })
       .expect(201);
 
-    const ownerList = await request(app).get("/api/posts").set("Authorization", `Bearer ${ownerToken}`).expect(200);
+    const ownerList = await request(app)
+      .get("/api/posts/feed?scope=all&limit=50")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .expect(200);
     const followerList = await request(app)
-      .get("/api/posts")
+      .get("/api/posts/feed?scope=all&limit=50")
       .set("Authorization", `Bearer ${followerToken}`)
       .expect(200);
     const strangerList = await request(app)
-      .get("/api/posts")
+      .get("/api/posts/feed?scope=all&limit=50")
       .set("Authorization", `Bearer ${strangerToken}`)
       .expect(200);
 
-    expect(ownerList.body.length).toBe(3);
-    expect(followerList.body.length).toBe(2);
-    expect(strangerList.body.length).toBe(1);
+    const countPosts = (body: { items: { kind: string }[] }) =>
+      body.items.filter((item) => item.kind === "post").length;
+
+    expect(countPosts(ownerList.body)).toBe(3);
+    expect(countPosts(followerList.body)).toBe(2);
+    expect(countPosts(strangerList.body)).toBe(1);
   });
 
   it("returns notifications for likes/comments/follows", async () => {
@@ -325,17 +331,17 @@ describe("posts security flow", () => {
       .expect(201);
 
     const followerList = await request(app)
-      .get(`/api/posts/by-user/${ownerUser.id}`)
+      .get(`/api/posts/by-user/${ownerUser.id}?limit=50`)
       .set("Authorization", `Bearer ${followerToken}`)
       .expect(200);
-    expect(followerList.body.length).toBe(2);
+    expect(followerList.body.posts.length).toBe(2);
 
     const strangerList = await request(app)
-      .get(`/api/posts/by-user/${ownerUser.id}`)
+      .get(`/api/posts/by-user/${ownerUser.id}?limit=50`)
       .set("Authorization", `Bearer ${strangerToken}`)
       .expect(200);
-    expect(strangerList.body.length).toBe(1);
-    expect(strangerList.body[0].content).toBe("public by user");
+    expect(strangerList.body.posts.length).toBe(1);
+    expect(strangerList.body.posts[0].content).toBe("public by user");
   });
 
   it("paginates by-user posts when limit query is set", async () => {

@@ -13,6 +13,16 @@ export const STORY_MEDIA_MAX_TOTAL_CHARS = 2_400_000;
 export type PersistedPostImage = { type: "image"; url: string };
 
 const DATA_IMAGE_RE = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+const UPLOAD_POST_PATH_RE = /^\/uploads\/posts\/[^/]+\/[^/?#]+$/i;
+const UPLOAD_POST_URL_RE = /^https?:\/\/[^/]+\/uploads\/posts\/[^/]+\/[^/?#]+$/i;
+
+function isPersistedPostImageUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u) return false;
+  if (DATA_IMAGE_RE.test(u)) return u.length <= POST_MEDIA_MAX_CHARS_PER_IMAGE;
+  if (UPLOAD_POST_PATH_RE.test(u) || UPLOAD_POST_URL_RE.test(u)) return true;
+  return false;
+}
 
 /** Avatar de perfil: misma familia que adjuntos de post (data URL o enlace http(s)). */
 export function isValidProfileAvatarUrlCandidate(value: string): boolean {
@@ -36,11 +46,12 @@ function parseMediaItems(
     const t = (item as { type?: unknown }).type;
     const url = (item as { url?: unknown }).url;
     if (t !== "image" || typeof url !== "string") return null;
-    if (!DATA_IMAGE_RE.test(url)) return null;
-    if (url.length > POST_MEDIA_MAX_CHARS_PER_IMAGE) return null;
-    totalChars += url.length;
-    if (totalChars > maxTotalChars) return null;
-    out.push({ type: "image", url });
+    if (!isPersistedPostImageUrl(url)) return null;
+    if (DATA_IMAGE_RE.test(url)) {
+      totalChars += url.length;
+      if (totalChars > maxTotalChars) return null;
+    }
+    out.push({ type: "image", url: url.trim() });
   }
   return out;
 }

@@ -1,50 +1,25 @@
 import { AUTH_STORAGE_KEY } from "../constants/storageKeys";
 
-const envPostsUrl = import.meta.env.VITE_API_URL?.trim();
-const envLegacyUrl = import.meta.env.VITE_LEGACY_API_URL?.trim();
-
-const POSTS_PORT = 4000;
-const LEGACY_PORT = 4001;
+const envApiUrl = import.meta.env.VITE_API_URL?.trim();
 
 function trimApiBase(url: string) {
   return url.replace(/\/$/, "");
 }
 
-function resolveDevPostsApiBase(): string {
-  if (envPostsUrl && envPostsUrl.length > 0) return trimApiBase(envPostsUrl);
-  // Mismo origen que Vite; vite.config.ts envía /api/posts → :4000
+function resolveDevApiBase(): string {
+  if (envApiUrl && envApiUrl.length > 0) return trimApiBase(envApiUrl);
   return "/api";
 }
 
-function resolveDevLegacyApiBase(): string {
-  if (envLegacyUrl && envLegacyUrl.length > 0) return trimApiBase(envLegacyUrl);
-  const main = resolveDevPostsApiBase();
-  if (main === "/api") return "/api";
-  if (main.includes(`:${POSTS_PORT}/`)) {
-    return main.replace(`:${POSTS_PORT}/`, `:${LEGACY_PORT}/`);
-  }
-  return main;
-}
-
-/** Goi Server — posts, feed, comentarios (Neon). */
+/** Goi Server — API principal (:4000 en dev vía proxy Vite). */
 export const API_BASE_URL = import.meta.env.PROD
-  ? envPostsUrl && envPostsUrl.length > 0
-    ? trimApiBase(envPostsUrl)
+  ? envApiUrl && envApiUrl.length > 0
+    ? trimApiBase(envApiUrl)
     : "/api"
-  : resolveDevPostsApiBase();
-
-/** Goi Web Express — auth, entrenos, social, uploads. */
-export const LEGACY_API_BASE_URL = import.meta.env.PROD
-  ? envLegacyUrl && envLegacyUrl.length > 0
-    ? trimApiBase(envLegacyUrl)
-    : API_BASE_URL
-  : resolveDevLegacyApiBase();
+  : resolveDevApiBase();
 
 if (import.meta.env.DEV) {
   console.log(`[Goi Web] API_BASE_URL → ${API_BASE_URL}`);
-  if (LEGACY_API_BASE_URL !== API_BASE_URL) {
-    console.log(`[Goi Web] LEGACY_API_BASE_URL → ${LEGACY_API_BASE_URL}`);
-  }
 }
 
 const AUTH_EXPIRED_EVENT = "auth:expired";
@@ -77,7 +52,7 @@ function shouldExpireSession(status: number, code: string) {
 
 function fallbackMessageForFailedRequest(status: number): string {
   if (status === 404) {
-    return "No se encontró la API en esta dirección (404). Comprueba VITE_API_URL (Goi Server :4000) y VITE_LEGACY_API_URL (Express :4001), o docs/deploy.md.";
+    return "No se encontró la API en esta dirección (404). Comprueba VITE_API_URL (Goi Server :4000) o docs/deploy.md.";
   }
   if (status >= 500) {
     return `Error en el servidor (${status}). Revisa los logs del backend; en producción hace falta JWT_SECRET y el proceso debe estar en marcha.`;
@@ -104,11 +79,6 @@ export type ApiFetchOptions = RequestInit & {
   /** Por defecto 12s; posts/Neon pueden usar más en postsApi. */
   timeoutMs?: number;
 };
-
-/** Rutas del backend Express legacy (auth, workouts, stories…). */
-export function legacyApiFetch<T>(path: string, options?: ApiFetchOptions): Promise<T> {
-  return apiFetch<T>(path, { ...options, baseUrl: LEGACY_API_BASE_URL });
-}
 
 const API_TIMEOUT_MS = 12_000;
 

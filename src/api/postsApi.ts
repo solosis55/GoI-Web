@@ -31,12 +31,6 @@ export async function getFeedPage(scope: "all" | "following" = "all", limit = 30
   };
 }
 
-/** Lista publicaciones (Goi Server). Preferir getFeedPage en el feed. */
-export async function getPosts() {
-  const page = await getFeedPage("all", 50);
-  return page.items.filter((i) => i.kind === "post").map((i) => i.post);
-}
-
 export async function createPost(input: CreatePostInput) {
   const sessionId =
     input.sessionId ??
@@ -100,11 +94,6 @@ export type PostsByUserPageResponse = {
   nextCursor: string | null;
   total: number;
 };
-
-export async function getPostsByUser(userId: string) {
-  const page = await getPostsByUserPage(userId, { limit: 50 });
-  return page.posts;
-}
 
 export async function getPostsByIds(ids: string[]): Promise<Post[]> {
   if (ids.length === 0) return [];

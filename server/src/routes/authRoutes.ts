@@ -10,10 +10,8 @@ import {
   register,
   requestPasswordReset,
   resetPasswordWithToken,
-  listBlockedUsers,
   listBlockedUsersPreviews,
   listPendingFollowRequests,
-  listSentFollowRequests,
   respondFollowRequest,
   toggleBlockUser,
   toggleFollow,
@@ -69,10 +67,8 @@ authRoutes.get("/following/:userId", requireAuth, getFollowing);
 authRoutes.get("/followers/:userId", requireAuth, getFollowers);
 authRoutes.post("/follow/:targetUserId", requireAuth, toggleFollow);
 authRoutes.get("/follow-requests", requireAuth, listPendingFollowRequests);
-authRoutes.get("/follow-requests/sent", requireAuth, listSentFollowRequests);
 authRoutes.post("/follow-requests/:requesterId", requireAuth, respondFollowRequest);
 authRoutes.post("/block/:targetUserId", requireAuth, toggleBlockUser);
-authRoutes.get("/blocks", requireAuth, listBlockedUsers);
 authRoutes.get("/blocks/previews", requireAuth, listBlockedUsersPreviews);
 authRoutes.get("/personal-body", requireAuth, getPersonalBody);
 authRoutes.put("/personal-body", requireAuth, putPersonalBody);

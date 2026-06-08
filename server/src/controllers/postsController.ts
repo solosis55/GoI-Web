@@ -3,7 +3,9 @@ import { Request, Response } from "express";
 import { createId, saveStore, store, Post } from "../services/store.js";
 import { buildFeedPage, type FeedScopeParam } from "../services/feedTimeline.js";
 import { sendError } from "../services/http.js";
-import { normalizePostMediaFromRequest } from "../services/postMedia.js";
+import { normalizePostMediaFromRequest, type PersistedPostImage } from "../services/postMedia.js";
+import { buildPostMediaPathname, tryRemovePostUploadDir } from "../services/postUploads.js";
+import { cleanupDraftPostUploads, type PostUploadRequest } from "../middleware/postImageUpload.js";
 import { isBlockedBetween } from "../services/profileVisibility.js";
 import { resolvePostSessionMeta } from "../services/postsSessionMeta.js";
 import { isLengthBetween, sanitizeText } from "../services/validation.js";
@@ -185,18 +187,6 @@ function mapPostWithInteractions(post: Post, viewerUserId: string) {
   };
 }
 
-export function listPosts(_req: Request, res: Response) {
-  const authUserId = String(res.locals.authUserId ?? "");
-  if (!authUserId) {
-    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
-    return;
-  }
-  const posts = [...store.posts]
-    .filter((p) => canUserViewPost(p, authUserId))
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  res.json(posts.map((p) => mapPostWithInteractions(p, authUserId)));
-}
-
 export function listFeed(req: Request, res: Response) {
   const authUserId = String(res.locals.authUserId ?? "");
   if (!authUserId) {
@@ -306,7 +296,6 @@ export function listPostsByUser(req: Request, res: Response) {
 
   const limitRaw = req.query.limit;
   const limitFirst = Array.isArray(limitRaw) ? limitRaw[0] : limitRaw;
-  const wantPagination = limitFirst !== undefined && String(limitFirst).trim() !== "";
 
   const cursorRaw =
     typeof req.query.cursor === "string"
@@ -320,23 +309,14 @@ export function listPostsByUser(req: Request, res: Response) {
     targetUser.profileVisibility === "followers" &&
     !store.follows.some((f) => f.followerId === authUserId && f.followingId === targetUserId)
   ) {
-    if (wantPagination) {
-      res.json({ posts: [], nextCursor: null, total: 0 });
-    } else {
-      res.json([]);
-    }
+    res.json({ posts: [], nextCursor: null, total: 0 });
     return;
   }
 
   const filtered = store.posts.filter((p) => p.userId === targetUserId && canUserViewPost(p, authUserId));
   const sorted = sortPostsNewestFirst(filtered);
 
-  if (!wantPagination) {
-    res.json(sorted.map((p) => mapPostWithInteractions(p, authUserId)));
-    return;
-  }
-
-  let limitNum = parseInt(String(limitFirst), 10);
+  let limitNum = parseInt(String(limitFirst ?? "50"), 10);
   if (!Number.isFinite(limitNum)) {
     sendError(res, 400, "POST_INVALID_INPUT", "invalid limit");
     return;
@@ -366,8 +346,41 @@ export function listPostsByUser(req: Request, res: Response) {
   });
 }
 
+function findPostForViewer(postId: string, viewerUserId: string): Post | null {
+  const post = store.posts.find((item) => item.id === postId);
+  if (!post) return null;
+  if (!canUserViewPost(post, viewerUserId)) return null;
+  return post;
+}
+
+export function getPostById(req: Request, res: Response) {
+  const authUserId = String(res.locals.authUserId ?? "");
+  if (!authUserId) {
+    sendError(res, 401, "AUTH_UNAUTHORIZED", "unauthorized");
+    return;
+  }
+
+  const id = String(req.params.id ?? "").trim();
+  if (!id) {
+    sendError(res, 400, "POST_INVALID_INPUT", "post id is required");
+    return;
+  }
+
+  const post = findPostForViewer(id, authUserId);
+  if (!post) {
+    sendError(res, 404, "POST_NOT_FOUND", "post not found");
+    return;
+  }
+
+  res.json(mapPostWithInteractions(post, authUserId));
+}
+
 export function createPost(req: Request, res: Response) {
   const authUserId = String(res.locals.authUserId ?? "");
+  const uploadReq = req as PostUploadRequest;
+  const draftPostId = uploadReq.draftPostId;
+  const uploadedFiles = uploadReq.files ?? [];
+
   const {
     content,
     format: rawFormat,
@@ -380,30 +393,48 @@ export function createPost(req: Request, res: Response) {
   const normalizedContent = sanitizeText(content);
   const normalizedVisibility = normalizeVisibility(visibility);
 
-  const normalizedAttach = normalizePostMediaFromRequest(mediaRaw);
-  if (normalizedAttach === null) {
-    sendError(res, 400, "POST_MEDIA_INVALID", "invalid image attachments");
-    return;
+  let attachments: PersistedPostImage[];
+  if (uploadedFiles.length > 0) {
+    if (!draftPostId) {
+      sendError(res, 500, "POST_MEDIA_INVALID", "missing draft post id");
+      return;
+    }
+    attachments = uploadedFiles.map((file) => ({
+      type: "image",
+      url: buildPostMediaPathname(draftPostId, file.filename),
+    }));
+  } else {
+    const normalizedAttach = normalizePostMediaFromRequest(mediaRaw);
+    if (normalizedAttach === null) {
+      cleanupDraftPostUploads(req);
+      sendError(res, 400, "POST_MEDIA_INVALID", "invalid image attachments");
+      return;
+    }
+    attachments = normalizedAttach ?? [];
   }
-  const attachments = normalizedAttach ?? [];
   const hasMedia = attachments.length > 0;
 
+  const reject = (status: number, code: string, message: string) => {
+    cleanupDraftPostUploads(req);
+    sendError(res, status, code, message);
+  };
+
   if (!hasMedia && !isLengthBetween(normalizedContent, 4, 280)) {
-    sendError(res, 400, "POST_INVALID_INPUT", "content is required");
+    reject(400, "POST_INVALID_INPUT", "content is required");
     return;
   }
   if (normalizedContent.length > 280) {
-    sendError(res, 400, "POST_INVALID_INPUT", "content exceeds max length");
+    reject(400, "POST_INVALID_INPUT", "content exceeds max length");
     return;
   }
   if (!normalizedVisibility) {
-    sendError(res, 400, "POST_INVALID_VISIBILITY", "invalid visibility");
+    reject(400, "POST_INVALID_VISIBILITY", "invalid visibility");
     return;
   }
 
   const userExists = store.users.some((user) => user.id === authUserId);
   if (!userExists) {
-    sendError(res, 401, "AUTH_SESSION_STALE", "jwt user id missing from store");
+    reject(401, "AUTH_SESSION_STALE", "jwt user id missing from store");
     return;
   }
 
@@ -413,29 +444,29 @@ export function createPost(req: Request, res: Response) {
   if (sessionId) {
     const session = store.workoutSessions.find((s) => s.id === sessionId);
     if (!session) {
-      sendError(res, 404, "POST_SESSION_NOT_FOUND", "session not found");
+      reject(404, "POST_SESSION_NOT_FOUND", "session not found");
       return;
     }
     if (session.userId !== authUserId) {
-      sendError(res, 403, "POST_SESSION_FORBIDDEN", "forbidden");
+      reject(403, "POST_SESSION_FORBIDDEN", "forbidden");
       return;
     }
     const alreadyLinked = store.posts.some((p) => p.sessionId === sessionId);
     if (alreadyLinked) {
-      sendError(res, 409, "POST_SESSION_ALREADY_LINKED", "session already linked to a post");
+      reject(409, "POST_SESSION_ALREADY_LINKED", "session already linked to a post");
       return;
     }
     workoutId = session.workoutId;
   } else if (workoutId) {
     const workoutExists = store.workouts.some((workout) => workout.id === workoutId);
     if (!workoutExists) {
-      sendError(res, 404, "POST_WORKOUT_NOT_FOUND", "workout not found");
+      reject(404, "POST_WORKOUT_NOT_FOUND", "workout not found");
       return;
     }
   }
 
   const post: Post = {
-    id: createId(),
+    id: draftPostId ?? createId(),
     userId: authUserId,
     content: normalizedContent,
     ...(hasMedia ? { media: attachments } : {}),
@@ -469,6 +500,7 @@ export function deletePost(req: Request, res: Response) {
 
   const postId = store.posts[index].id;
   const [removed] = store.posts.splice(index, 1);
+  tryRemovePostUploadDir(postId);
   store.likes = store.likes.filter((like) => like.postId !== postId);
   store.comments = store.comments.filter((comment) => comment.postId !== postId);
   saveStore();

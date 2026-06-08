@@ -24,7 +24,17 @@ export function getBannersDir(): string {
   return join(getUploadsRoot(), "banners");
 }
 
+export function getPostsUploadRoot(): string {
+  return join(getUploadsRoot(), "posts");
+}
+
+export function getPostMediaDir(postId: string): string {
+  const safeId = postId.replace(/[/\\]/g, "");
+  return join(getPostsUploadRoot(), safeId);
+}
+
 export function ensureProfileUploadDirs(): void {
   mkdirSync(getAvatarsDir(), { recursive: true });
   mkdirSync(getBannersDir(), { recursive: true });
+  mkdirSync(getPostsUploadRoot(), { recursive: true });
 }
