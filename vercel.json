@@ -3,10 +3,5 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "build": {
-    "env": {
-      "VITE_API_URL": "https://goi-server.onrender.com/api"
-    }
-  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
