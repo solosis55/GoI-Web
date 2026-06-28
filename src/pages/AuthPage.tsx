@@ -1,17 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
-import { login, register, requestPasswordReset, resetPasswordWithToken } from "../api/authApi";
+import {
+  login,
+  register,
+  requestPasswordReset,
+  resendVerificationEmail,
+  resetPasswordWithToken,
+  verifyEmailWithToken,
+} from "../api/authApi";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { StatusMessage } from "../components/ui/StatusMessage";
 import { useAuth } from "../context/AuthContext";
 import { getErrorMessage } from "../utils/errorMessages";
 
-type AuthView = "register" | "login" | "forgot" | "reset";
+type AuthView =
+  | "register"
+  | "login"
+  | "forgot"
+  | "reset"
+  | "verify-pending"
+  | "verify-confirmed";
 
 const labelClass = "grid gap-1.5 font-semibold text-neutral-200 light:text-zinc-800";
 const fieldClass = "goi-field w-full";
+const MIN_PASSWORD = 8;
 
 export function AuthPage() {
   const { setAuth } = useAuth();
@@ -20,11 +35,14 @@ export function AuthPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [devResetHint, setDevResetHint] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [rateLimited, setRateLimited] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -39,19 +57,57 @@ export function AuthPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get("reset");
-    if (token) {
-      setResetToken(token);
+    const verifyToken = params.get("verify");
+    const resetParam = params.get("reset");
+    const verified = params.get("verified");
+    const verifyError = params.get("verifyError");
+
+    if (verified === "1") {
+      clearUrlParam("verified");
+      setView("verify-confirmed");
+      setMessage("Email confirmado. Ya puedes iniciar sesión.");
+      return;
+    }
+
+    if (verifyError === "1") {
+      clearUrlParam("verifyError");
+      setView("login");
+      setError("El enlace de verificación no es válido o ha caducado. Puedes solicitar uno nuevo al iniciar sesión.");
+      return;
+    }
+
+    if (verifyToken) {
+      setError("");
+      setMessage("");
+      setLoading(true);
+      void verifyEmailWithToken(verifyToken)
+        .then(() => {
+          clearUrlParam("verify");
+          setView("verify-confirmed");
+          setMessage("Email confirmado. Ya puedes iniciar sesión.");
+        })
+        .catch((err) => {
+          clearUrlParam("verify");
+          setView("login");
+          setError(getErrorMessage(err, "No se pudo verificar el email"));
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    if (resetParam) {
+      setResetToken(resetParam);
       setView("reset");
       setError("");
       setMessage("");
     }
   }, []);
 
-  function clearUrlResetParam() {
+  function clearUrlParam(key: "reset" | "verify" | "verified" | "verifyError") {
     const url = new URL(window.location.href);
-    url.searchParams.delete("reset");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    url.searchParams.delete(key);
+    const q = url.searchParams.toString();
+    window.history.replaceState({}, "", `${url.pathname}${q ? `?${q}` : ""}`);
   }
 
   function handleRateLimited() {
@@ -65,28 +121,62 @@ export function AuthPage() {
     }, 60_000);
   }
 
+  async function handleResendVerification(targetEmail?: string) {
+    const normalized = (targetEmail ?? pendingEmail ?? email).trim();
+    if (!normalized) {
+      setError("Introduce el email de tu cuenta.");
+      return;
+    }
+    setResendLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await resendVerificationEmail(normalized);
+      setMessage(response.message);
+      if (import.meta.env.DEV && response.devVerificationToken) {
+        const link = `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(response.devVerificationToken)}`;
+        setDevResetHint(`Modo desarrollo: ${link}`);
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "AUTH_RATE_LIMITED") {
+        handleRateLimited();
+        return;
+      }
+      setError(getErrorMessage(err, "No se pudo reenviar el correo"));
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
   async function handleLoginOrRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
+    setDevResetHint("");
     setLoading(true);
 
     try {
       if (view === "register" && username.trim().length < 3) {
         throw new Error("El usuario debe tener al menos 3 caracteres");
       }
-      if (password.length < 6) {
-        throw new Error("La contraseña debe tener al menos 6 caracteres");
+      if (password.length < MIN_PASSWORD) {
+        throw new Error(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`);
+      }
+      if (view === "register" && !acceptedLegal) {
+        throw new Error("Debes aceptar el aviso legal y la política de privacidad");
       }
 
       if (view === "register") {
         const reg = await register({ username: username.trim(), email, password });
+        if (reg.requiresEmailVerification || !reg.token) {
+          setPendingEmail(email.trim());
+          setPassword("");
+          setView("verify-pending");
+          setMessage("Te hemos enviado un correo para confirmar tu cuenta. Revisa bandeja y spam.");
+          return;
+        }
         if (reg.token && reg.user) {
           setAuth(reg.token, reg.user);
-        } else {
-          const loginResponse = await login({ email, password });
-          if (!loginResponse.token) throw new Error("Login token missing");
-          setAuth(loginResponse.token, loginResponse.user);
         }
       } else {
         const response = await login({ email, password });
@@ -96,6 +186,11 @@ export function AuthPage() {
     } catch (submitError) {
       if (submitError instanceof ApiError && submitError.code === "AUTH_RATE_LIMITED") {
         handleRateLimited();
+        return;
+      }
+      if (submitError instanceof ApiError && submitError.code === "AUTH_EMAIL_NOT_VERIFIED") {
+        setPendingEmail(email.trim());
+        setError(getErrorMessage(submitError, "Confirma tu email antes de entrar."));
         return;
       }
       setError(getErrorMessage(submitError, "No se pudo autenticar"));
@@ -137,8 +232,8 @@ export function AuthPage() {
     setMessage("");
     setLoading(true);
 
-    if (newPassword.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+    if (newPassword.length < MIN_PASSWORD) {
+      setError(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`);
       setLoading(false);
       return;
     }
@@ -154,7 +249,7 @@ export function AuthPage() {
       setNewPassword("");
       setConfirmNewPassword("");
       setResetToken("");
-      clearUrlResetParam();
+      clearUrlParam("reset");
       setView("login");
     } catch (submitError) {
       if (submitError instanceof ApiError && submitError.code === "AUTH_RATE_LIMITED") {
@@ -174,7 +269,11 @@ export function AuthPage() {
         ? "Iniciar sesión"
         : view === "forgot"
           ? "Recuperar contraseña"
-          : "Nueva contraseña";
+          : view === "reset"
+            ? "Nueva contraseña"
+            : view === "verify-pending"
+              ? "Confirma tu email"
+              : "Email confirmado";
 
   return (
     <section className="layout mx-auto w-full max-w-[480px] sm:max-w-[520px]">
@@ -188,6 +287,9 @@ export function AuthPage() {
           {view === "login" && "Introduce tus credenciales para continuar."}
           {view === "forgot" && "Te enviaremos instrucciones si el correo está registrado."}
           {view === "reset" && "Define una contraseña nueva para volver a entrar."}
+          {view === "verify-pending" &&
+            "Abre el enlace del correo para activar tu cuenta. Si no lo ves, revisa spam."}
+          {view === "verify-confirmed" && "Tu cuenta ya está activa."}
         </p>
 
         {(view === "register" || view === "login") && (
@@ -225,13 +327,35 @@ export function AuthPage() {
                 className={fieldClass}
                 required
                 type="password"
-                minLength={6}
+                minLength={MIN_PASSWORD}
                 autoComplete={view === "register" ? "new-password" : "current-password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={`Mínimo ${MIN_PASSWORD} caracteres`}
               />
             </label>
+
+            {view === "register" && (
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-neutral-300 light:text-zinc-700">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 shrink-0 accent-goi-gold"
+                  checked={acceptedLegal}
+                  onChange={(event) => setAcceptedLegal(event.target.checked)}
+                />
+                <span>
+                  Acepto el{" "}
+                  <Link className="text-goi-gold hover:underline" to="/aviso-legal" target="_blank">
+                    aviso legal
+                  </Link>{" "}
+                  y la{" "}
+                  <Link className="text-goi-gold hover:underline" to="/privacidad" target="_blank">
+                    política de privacidad
+                  </Link>
+                  .
+                </span>
+              </label>
+            )}
 
             {view === "login" && (
               <Button
@@ -250,21 +374,86 @@ export function AuthPage() {
 
             <StatusMessage tone="dark" error={error} success={message} />
 
+            {view === "login" && error && pendingEmail ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={resendLoading || rateLimited}
+                className="w-full"
+                onClick={() => void handleResendVerification(pendingEmail)}
+              >
+                {resendLoading ? "Reenviando…" : "Reenviar correo de verificación"}
+              </Button>
+            ) : null}
+
             <Button type="submit" disabled={loading || rateLimited} className="w-full">
-              {loading ? "Procesando..." : rateLimited ? "Espera un momento..." : view === "register" ? "Crear cuenta" : "Entrar"}
+              {loading
+                ? "Procesando..."
+                : rateLimited
+                  ? "Espera un momento..."
+                  : view === "register"
+                    ? "Crear cuenta"
+                    : "Entrar"}
             </Button>
           </form>
+        )}
+
+        {view === "verify-pending" && (
+          <div className="grid gap-3.5">
+            <p className="m-0 text-sm text-neutral-300 light:text-zinc-700">
+              Hemos enviado un enlace a{" "}
+              <strong className="font-semibold text-neutral-100 light:text-zinc-900">{pendingEmail}</strong>.
+            </p>
+            <StatusMessage tone="dark" error={error} success={message} />
+            {devResetHint ? (
+              <pre className="fs-muted-well max-h-40 overflow-auto whitespace-pre-wrap break-all p-3 text-xs leading-relaxed text-neutral-400 light:text-zinc-600">
+                {devResetHint}
+              </pre>
+            ) : null}
+            <Button
+              type="button"
+              disabled={resendLoading || rateLimited}
+              className="w-full"
+              onClick={() => void handleResendVerification()}
+            >
+              {resendLoading ? "Reenviando…" : "Reenviar correo"}
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="!mt-1"
+              onClick={() => {
+                setError("");
+                setMessage("");
+                setDevResetHint("");
+                setView("login");
+              }}
+            >
+              Ir a iniciar sesión
+            </Button>
+          </div>
+        )}
+
+        {view === "verify-confirmed" && (
+          <div className="grid gap-3.5">
+            <StatusMessage tone="dark" success={message || "Email confirmado."} />
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => {
+                setMessage("");
+                setView("login");
+              }}
+            >
+              Iniciar sesión
+            </Button>
+          </div>
         )}
 
         {view === "forgot" && (
           <form className="grid gap-3.5" onSubmit={handleForgotPassword}>
             <p className="m-0 text-sm leading-relaxed text-neutral-400 light:text-zinc-600">
-              Indica el correo de tu cuenta. Si existe, podrás restablecer la contraseña (en producción llegaría un email; en
-              local revisa la documentación y{" "}
-              <code className="rounded bg-neutral-800 px-1 py-0.5 font-mono text-xs text-goi-gold">
-                AUTH_RESET_RETURN_TOKEN
-              </code>
-              ).
+              Indica el correo de tu cuenta. Si existe, recibirás un email con instrucciones (revisa también spam).
             </p>
             <label className={labelClass}>
               Email
@@ -312,11 +501,11 @@ export function AuthPage() {
                 className={fieldClass}
                 required
                 type="password"
-                minLength={6}
+                minLength={MIN_PASSWORD}
                 autoComplete="new-password"
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={`Mínimo ${MIN_PASSWORD} caracteres`}
               />
             </label>
             <label className={labelClass}>
@@ -325,11 +514,11 @@ export function AuthPage() {
                 className={fieldClass}
                 required
                 type="password"
-                minLength={6}
+                minLength={MIN_PASSWORD}
                 autoComplete="new-password"
                 value={confirmNewPassword}
                 onChange={(event) => setConfirmNewPassword(event.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={`Mínimo ${MIN_PASSWORD} caracteres`}
               />
             </label>
             <StatusMessage tone="dark" error={error} success={message} />
@@ -343,7 +532,7 @@ export function AuthPage() {
               onClick={() => {
                 setError("");
                 setMessage("");
-                clearUrlResetParam();
+                clearUrlParam("reset");
                 setView("login");
               }}
             >

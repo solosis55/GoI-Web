@@ -30,6 +30,20 @@ export type AuthResponse = {
   token?: string;
 };
 
+export type RegisterResponse = AuthResponse & {
+  requiresEmailVerification?: boolean;
+  devVerificationToken?: string;
+};
+
+export type ResendVerificationResponse = {
+  message: string;
+  devVerificationToken?: string;
+};
+
+export type VerifyEmailResponse = {
+  message: string;
+};
+
 export type RegisterInput = {
   username: string;
   email: string;
@@ -67,6 +81,29 @@ export type UpdateProfileInput = Partial<{
   pinnedPostId: string | null;
 }>;
 
+export type DiscoverMutualPreview = {
+  id: string;
+  username: string;
+  avatarUrl: string;
+};
+
 export type DiscoverUser = ProfileUser & {
   isFollowing: boolean;
+  followPending?: boolean;
+  mutualCount?: number;
+  mutualPreview?: DiscoverMutualPreview[];
+  reason?: string;
+  activeThisWeek?: boolean;
+  trainedThisWeek?: boolean;
+  distanceKm?: number | null;
+  nearby?: boolean;
+};
+
+export type DiscoverFacetParam = "all" | "active" | "trained" | "sameGoal" | "nearby";
+
+export type DiscoverPageResponse = {
+  users: DiscoverUser[];
+  nextOffset: number | null;
+  total?: number;
+  facet?: DiscoverFacetParam;
 };

@@ -13,7 +13,7 @@ import { PostMediaGallery } from "./PostMediaGallery";
 
 type Visibility = NonNullable<CreatePostInput["visibility"]>;
 
-export type PendingPostImage = { id: string; dataUrl: string; name: string };
+export type PendingPostImage = { id: string; dataUrl: string; name: string; uploadFile: File };
 export type ComposerTransferState = {
   phase: "processing" | "uploading" | "error";
   progress: number;

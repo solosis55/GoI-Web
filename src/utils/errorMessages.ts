@@ -3,7 +3,12 @@ import { ApiError } from "../api/client";
 const codeMessageMap: Record<string, string> = {
   AUTH_INVALID_CREDENTIALS: "Email o contraseña incorrectos.",
   AUTH_EMAIL_IN_USE: "Ese email ya está registrado.",
-  AUTH_REGISTER_INVALID_INPUT: "Revisa usuario, email y contraseña (mínimo 6 caracteres).",
+  AUTH_USERNAME_IN_USE: "Ese nombre de usuario ya está en uso.",
+  AUTH_EMAIL_NOT_VERIFIED:
+    "Confirma tu email antes de entrar. Revisa tu bandeja (y spam) o solicita un nuevo enlace.",
+  AUTH_VERIFY_TOKEN_INVALID: "El enlace de verificación no es válido o ha caducado. Solicita uno nuevo.",
+  AUTH_VERIFY_INVALID_INPUT: "El enlace de verificación no es válido.",
+  AUTH_REGISTER_INVALID_INPUT: "Revisa usuario, email y contraseña (mínimo 8 caracteres).",
   AUTH_LOGIN_INVALID_INPUT: "Debes introducir email y contraseña.",
   AUTH_UNAUTHORIZED: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   AUTH_TOKEN_INVALID: "Tu sesión no es válida. Vuelve a iniciar sesión.",
@@ -15,7 +20,7 @@ const codeMessageMap: Record<string, string> = {
   AUTH_JWT_NOT_CONFIGURED:
     "El servidor no tiene configurada la variable JWT_SECRET (en Vercel: Settings → Environment Variables). Añádela y vuelve a desplegar.",
   AUTH_FORGOT_PASSWORD_INVALID_INPUT: "Introduce un correo electrónico válido.",
-  AUTH_RESET_INVALID_INPUT: "La contraseña debe tener al menos 6 caracteres y el enlace debe ser válido.",
+  AUTH_RESET_INVALID_INPUT: "La contraseña debe tener al menos 8 caracteres y el enlace debe ser válido.",
   AUTH_RESET_TOKEN_INVALID: "El enlace de restablecimiento no es válido o ha caducado. Solicita uno nuevo.",
   AUTH_USER_NOT_FOUND: "El usuario no existe.",
   POST_FORBIDDEN: "No puedes modificar esta publicación.",

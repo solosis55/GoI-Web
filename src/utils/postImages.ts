@@ -157,20 +157,40 @@ export async function compressManyStorySlides(
   return out;
 }
 
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** JPEG listo para multipart a partir de un data URL (p. ej. tras recortar). */
+export async function jpegFileFromDataUrl(dataUrl: string, filename: string): Promise<File> {
+  const blob = await fetch(dataUrl).then((response) => response.blob());
+  const jpegName =
+    filename.toLowerCase().endsWith(".jpg") || filename.toLowerCase().endsWith(".jpeg")
+      ? filename
+      : `${filename.replace(/\.[^.]+$/, "") || "photo"}.jpg`;
+  return new File([blob], jpegName, { type: "image/jpeg" });
+}
+
 export async function compressManyImageFiles(
   incoming: FileList | File[],
   alreadyCount: number,
   onProgress?: (completed: number, total: number) => void,
-): Promise<{ dataUrl: string; name: string }[]> {
+): Promise<{ dataUrl: string; name: string; uploadFile: File }[]> {
   const files = [...incoming].filter((f) => f.type.startsWith("image/"));
   const slice = files.slice(0, Math.max(0, POST_IMAGE_MAX_FILES - alreadyCount));
-  const out: { dataUrl: string; name: string }[] = [];
+  const out: { dataUrl: string; name: string; uploadFile: File }[] = [];
   onProgress?.(0, slice.length);
   for (const file of slice) {
-    const dataUrl = await compressImageFileToDataUrlSafe(file);
-    out.push({ dataUrl, name: file.name });
+    const uploadFile = await compressImageFileToJpegFile(file, file.name);
+    const dataUrl = await readBlobAsDataUrl(uploadFile);
+    out.push({ dataUrl, name: file.name, uploadFile });
+    onProgress?.(out.length, slice.length);
   }
-  onProgress?.(out.length, slice.length);
   return out;
 }
 

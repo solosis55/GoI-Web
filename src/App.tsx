@@ -69,13 +69,22 @@ function stripPostQueryFromUrl() {
 
 type AuthWelcomePhase = "splash" | "form";
 
-function readAuthWelcomePhaseInitial(): AuthWelcomePhase {
+function authDeepLinkInUrl(): boolean {
   try {
-    if (new URLSearchParams(window.location.search).get("reset")?.trim()) return "form";
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(
+      params.get("reset")?.trim() ||
+        params.get("verify")?.trim() ||
+        params.get("verified") === "1" ||
+        params.get("verifyError") === "1",
+    );
   } catch {
-    /* ignore */
+    return false;
   }
-  return "splash";
+}
+
+function readAuthWelcomePhaseInitial(): AuthWelcomePhase {
+  return authDeepLinkInUrl() ? "form" : "splash";
 }
 
 function AppContent() {
@@ -159,7 +168,9 @@ function AppContent() {
       setCatalogFromEditor(false);
       setExerciseDetailFromEditor(false);
       setExerciseDetailReturnTarget("catalog");
-      setAuthWelcomePhase("splash");
+      if (!authDeepLinkInUrl()) {
+        setAuthWelcomePhase("splash");
+      }
     }
   }, [isAuthenticated]);
 
