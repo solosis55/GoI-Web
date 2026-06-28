@@ -38,7 +38,7 @@ const codeMessageMap: Record<string, string> = {
   WORKOUT_SESSION_FORBIDDEN: "No puedes modificar este entrenamiento.",
   EXERCISE_NOT_FOUND: "Ese ejercicio no existe en el catálogo.",
   API_NETWORK_ERROR:
-    "No se pudo conectar con la API. En local: arranca Goi Server (:4000), Express (:4001) y reinicia Vite (:5173). Si solo fallan posts, revisa Neon/internet.",
+    "No se pudo conectar con la API. En local: arranca Goi Server (:4000) y reinicia Vite (:5173). En prod, comprueba VITE_API_URL (Render).",
   API_INVALID_RESPONSE:
     "La API devolvió un formato inesperado. Si desplegaste solo el frontend, falta el servidor en /api o la variable VITE_API_URL (ver docs/deploy.md).",
 };

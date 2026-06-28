@@ -31,23 +31,30 @@ Web tipo **red social + deporte**: publicar progreso en un feed comunitario, lle
 
 ## Desarrollo local
 
+**Backend de referencia:** [Goi Server](../Goi%20Server) en `http://localhost:4000` (Neon). La carpeta `server/` (Express + `store.json`) es **legacy** — solo tests/migraciones.
+
 1. **Instalar dependencias** (desde la raíz del repo):
 
    ```bash
    npm install
-   cd server && npm install && cd ..
    ```
 
-2. **Variables del servidor** (opcional en local): copia `server/.env.example` a `server/.env` y ajusta. Para JWT en entornos cercanos a producción define `JWT_SECRET`.
+2. **Arrancar Goi Server** (repo hermano `Goi Server`):
 
-3. **Arrancar**:
+   ```bash
+   cd "../Goi Server"
+   npm install && npm run dev
+   ```
 
-   - Frontend: en la raíz, `npm run dev` → suele quedar en `http://localhost:5173`.
-   - Backend: en la carpeta `server`, `npm run dev` → API en `http://localhost:4000` (puerto configurable con `PORT`).
+3. **Arrancar el frontend** (esta carpeta):
 
-   El cliente usa por defecto `http://localhost:4000/api` en modo desarrollo (`src/api/client.ts`).
+   ```bash
+   npm run dev
+   ```
 
-4. **Correo de contacto** (solo cliente, opcional): en `.env.local` en la raíz puedes definir `VITE_CONTACT_EMAIL=tu-correo@dominio`; se mostrará en `/contacto` y puedes usarlo en los datos identificativos de las páginas legales al completarlos.
+   Abre `http://localhost:5173`. Vite hace proxy de `/api` y `/uploads` a `:4000` (`vite.config.ts`).
+
+4. **Correo de contacto** (opcional): en `.env.local`, `VITE_CONTACT_EMAIL=tu-correo@dominio`.
 
 ## Usuarios de prueba (datos locales)
 
@@ -91,18 +98,18 @@ Cualquier cambio sustancial debe dejarse reflejado en los docs del repo: **`READ
 
 ## Despliegue
 
-Guía detallada (variables, Docker, persistencia de `store.json`, checklist): **[docs/deploy.md](./docs/deploy.md)**. Resumen para entregas académicas (mismo contenido enlazado): **[docs/deployment.md](./docs/deployment.md)**. Incluye **Vercel** con `vercel.json` + función `api/index.mjs` (mismo dominio para SPA y `/api`).
-
-### Producción (URLs)
-
-Sustituye los placeholders cuando tengas el proyecto publicado (por ejemplo en **Vercel**):
+**Producción (Fase 0):** frontend en **Vercel**, API en **Render** (Goi Server + Neon).
 
 | Entorno | URL |
 |---------|-----|
-| **Frontend (SPA)** | `https://TU-PROYECTO.vercel.app` *(ejemplo)* |
-| **API** | **Mismo origen:** rutas bajo `/api` en esa misma URL *(despliegue unificado recomendado)*. Si el front y la API están en hosts distintos, define **`VITE_API_URL`** en el build del cliente y documenta aquí la base del API. |
+| **Web (SPA)** | [https://go-i.vercel.app](https://go-i.vercel.app) |
+| **API** | `https://goi-server.onrender.com/api` |
 
-Comprobación rápida tras desplegar: **`GET .../api/health`** debe responder `200` con JSON `ok: true`; luego login y una acción del feed desde el navegador.
+El build de Vercel define `VITE_API_URL` en `vercel.json` (cliente → Render). **No** se despliega Express en Vercel; ver `api/README.md`.
+
+Comprobación: `GET https://goi-server.onrender.com/api/health` → `ok: true`; luego login desde [go-i.vercel.app](https://go-i.vercel.app).
+
+Guía histórica (Express unificado, Docker): **[docs/deploy.md](./docs/deploy.md)**.
 
 ## Documentación en el repo
 

@@ -1,15 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install && npm install --prefix server",
-  "buildCommand": "npm run vercel-build",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/index.mjs": {
-      "includeFiles": "server/dist/**"
+  "build": {
+    "env": {
+      "VITE_API_URL": "https://goi-server.onrender.com/api"
     }
-  }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
