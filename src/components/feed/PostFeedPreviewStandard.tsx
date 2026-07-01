@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { CreatePostInput, SessionExercisePreview } from "../../types/post";
 import { POST_IMAGE_MAX_FILES } from "../../constants/createPost";
+import { standardHeroAspectClass } from "../../constants/postPreviewLayout";
 import { Avatar } from "../ui/Avatar";
 import { PostActions } from "./PostActions";
 import { PostMediaGallery } from "./PostMediaGallery";
@@ -34,6 +35,8 @@ type PostFeedPreviewStandardProps = {
   onPressSessionPreview?: () => void;
   onPressViewSession?: () => void;
   linkedSession?: LinkedSessionPreview | null;
+  /** Composer: preview reducida junto al panel de edición. */
+  compact?: boolean;
 };
 
 /** Vista previa feed estándar — foto → acciones → caption (paridad App). */
@@ -52,6 +55,7 @@ export function PostFeedPreviewStandard({
   onPressSessionPreview,
   onPressViewSession,
   linkedSession,
+  compact = false,
 }: PostFeedPreviewStandardProps) {
   const visibilityLabel =
     visibility === "public" ? "Público" : visibility === "followers" ? "Seguidores" : "Solo yo";
@@ -64,17 +68,20 @@ export function PostFeedPreviewStandard({
 
   return (
     <article
-      className="feed-post-card flex flex-col overflow-hidden rounded-2xl border"
+      className={[
+        "feed-post-card flex flex-col overflow-hidden rounded-2xl border",
+        compact ? "w-full shadow-sm" : "",
+      ].join(" ")}
       aria-label="Vista previa de la publicación"
     >
-      <div className="flex items-start justify-between gap-3 p-4 sm:p-5 sm:pb-3">
+      <div className={compact ? "flex items-start gap-3 p-4 pb-2" : "flex items-start justify-between gap-3 p-4 sm:p-5 sm:pb-3"}>
         <div className="flex min-w-0 flex-1 gap-3.5">
-          <div className="shrink-0 pt-1">
-            <Avatar src={avatarUrl} alt={username} size={46} />
+          <div className="shrink-0 pt-0.5">
+            <Avatar src={avatarUrl} alt={username} size={compact ? 42 : 46} />
           </div>
-          <div className="min-w-0 flex-1 border-b border-neutral-800/40 pb-3 light:border-zinc-200/75">
-            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-              <span className="text-[15px] font-semibold tracking-tight text-neutral-100 light:text-zinc-900">
+          <div className={compact ? "min-w-0 flex-1 border-b border-neutral-800/40 pb-2.5 light:border-zinc-200/75" : "min-w-0 flex-1 border-b border-neutral-800/40 pb-3 light:border-zinc-200/75"}>
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className={compact ? "text-[14px] font-semibold tracking-tight text-neutral-100 light:text-zinc-900" : "text-[15px] font-semibold tracking-tight text-neutral-100 light:text-zinc-900"}>
                 {username}
                 <span className="font-normal text-neutral-500"> (tu)</span>
               </span>
@@ -94,12 +101,22 @@ export function PostFeedPreviewStandard({
       </div>
 
       {hasMedia ? (
-        <PostMediaGallery layout="hero" media={mediaItems} feedInteractive />
+        <div
+          className={[
+            standardHeroAspectClass(),
+            "w-full overflow-hidden bg-neutral-950 light:bg-zinc-100",
+          ].join(" ")}
+        >
+          <PostMediaGallery layout="hero" media={mediaItems} feedInteractive heroCover />
+        </div>
       ) : editorMode ? (
         <button
           type="button"
           onClick={onPressAddMedia}
-          className="group relative flex min-h-[min(52vw,320px)] w-full flex-col items-center justify-center gap-2 border-t border-neutral-800/65 bg-neutral-950/80 light:border-zinc-200 light:bg-zinc-100"
+          className={[
+            standardHeroAspectClass(),
+            "group relative flex w-full flex-col items-center justify-center gap-2 border-t border-neutral-800/65 bg-neutral-950/80 light:border-zinc-200 light:bg-zinc-100",
+          ].join(" ")}
         >
           <span className="inline-flex size-12 items-center justify-center rounded-full border border-goi-gold/55 bg-goi-gold/15 text-3xl font-light text-goi-gold">
             +
@@ -159,7 +176,7 @@ export function PostFeedPreviewStandard({
         ) : null}
       </button>
 
-      {editorMode ? (
+      {editorMode && !compact ? (
         <p className="px-4 pb-3 text-center text-[11px] font-semibold uppercase tracking-wide text-goi-gold-dim sm:px-5">
           Vista previa del feed
         </p>

@@ -17,6 +17,12 @@ import {
   buildSessionExercisePreviews,
   countRemainingExercises,
 } from "../../utils/sessionExercisePreview";
+import { composerEditorGridClass } from "../../constants/postPreviewLayout";
+import {
+  CREATE_POST_FORM_ID,
+  type CreatePostComposerActions,
+  type CreatePostComposerSection,
+} from "./composer/createPostComposerActions";
 
 type Visibility = NonNullable<CreatePostInput["visibility"]>;
 
@@ -45,27 +51,20 @@ type CreatePostFormProps = {
   transferState?: ComposerTransferState | null;
   mediaBusy?: boolean;
   onMentionPick?: (picked: MentionPickUser) => void;
-  onApplyTemplate?: (templateText: string) => void;
   mentionCandidates: MentionPickUser[];
   previewAuthor?: { username: string; avatarUrl: string };
   mentionDirectory?: MentionUserDirectory;
   selectedSessionId?: string;
   sessions?: WorkoutSessionWithTitle[];
+  sessionPicker?: import("../../hooks/usePostSessionPicker").PostSessionPickerController;
   onChangeSessionId?: (sessionId: string) => void;
+  hideSubmit?: boolean;
+  onRegisterActions?: (actions: CreatePostComposerActions) => void;
+  activeSection?: CreatePostComposerSection;
+  onActiveSectionChange?: (section: CreatePostComposerSection) => void;
 };
 
 const EMPTY_MENTION_MAP: MentionUserDirectory = new Map();
-
-const QUICK_TEMPLATES: { id: string; label: string; text: string }[] = [
-  { id: "pr", label: "PR", text: "PR de [ejercicio]: [peso/reps]\nContexto: [sensaciones/técnica]" },
-  { id: "checkin", label: "Check-in", text: "Entreno hecho ✅\nEnfoque: [fuerza/cardio/movilidad]" },
-  {
-    id: "resumen",
-    label: "Resumen",
-    text: "Objetivo de la semana: ...\nLo mejor del entreno: ...\nPróximo paso: ...",
-  },
-  { id: "pregunta", label: "Pregunta", text: "¿Algún consejo para mejorar [ejercicio/meta]? 👀" },
-];
 
 export function CreatePostForm({
   content,
@@ -85,13 +84,17 @@ export function CreatePostForm({
   transferState = null,
   mediaBusy = false,
   onMentionPick,
-  onApplyTemplate,
   mentionCandidates,
   previewAuthor,
   mentionDirectory,
   selectedSessionId = "",
   sessions = [],
+  sessionPicker,
   onChangeSessionId,
+  hideSubmit = false,
+  onRegisterActions,
+  activeSection = "content",
+  onActiveSectionChange,
 }: CreatePostFormProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
@@ -155,14 +158,46 @@ export function CreatePostForm({
   }, [pendingImages, activeImageId]);
 
   const openFilePicker = () => fileRef.current?.click();
+  const goToSection = (section: CreatePostComposerSection) => onActiveSectionChange?.(section);
   const focusCaption = () => {
-    const panel = document.getElementById("create-post-caption-panel");
-    panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    panel?.querySelector("textarea")?.focus();
+    goToSection("content");
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById("create-post-caption-panel");
+      target?.querySelector("textarea")?.focus();
+    });
+  };
+  const openOptions = () => {
+    goToSection("privacy");
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLSelectElement>("#create-post-visibility-panel select")?.focus();
+    });
+  };
+  const openSessionPanel = () => {
+    goToSection("content");
+    setSessionPickerOpen(true);
   };
 
+  useEffect(() => {
+    if (!onRegisterActions) return;
+    onRegisterActions({
+      openContent: () => {
+        goToSection("content");
+        window.requestAnimationFrame(() => {
+          document.getElementById("create-post-caption-panel")?.querySelector("textarea")?.focus();
+        });
+      },
+      openMedia: () => goToSection("media"),
+      openPrivacy: openOptions,
+      openSession: openSessionPanel,
+    });
+  }, [onRegisterActions, onActiveSectionChange, selectedSessionId]);
+
   return (
-    <form className="stack flex min-h-0 flex-col gap-4" onSubmit={onSubmit}>
+    <form
+      id={CREATE_POST_FORM_ID}
+      className="stack flex min-h-0 flex-col gap-4"
+      onSubmit={onSubmit}
+    >
       <input
         ref={fileRef}
         type="file"
@@ -177,8 +212,8 @@ export function CreatePostForm({
         }}
       />
 
-      <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
-        <div className="min-w-0">
+      <div className={["grid min-h-0 gap-4 md:items-start", composerEditorGridClass()].join(" ")}>
+        <div className="min-w-0 md:sticky md:top-0">
           {previewAuthor ? (
             <PostFeedPreviewStandard
               username={previewAuthor.username}
@@ -187,8 +222,12 @@ export function CreatePostForm({
               content={content}
               imageUrls={imageUrls}
               editorMode
+              compact
               mentionDirectory={mentionDirResolved}
-              onPressAddMedia={openFilePicker}
+              onPressAddMedia={() => {
+                goToSection("media");
+                openFilePicker();
+              }}
               onPressEditCaption={focusCaption}
               showSessionInline={sessionInlineOpen && Boolean(selectedSessionId)}
               sessionPreviewActive={sessionInlineOpen}
@@ -202,7 +241,9 @@ export function CreatePostForm({
           ) : null}
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3">
+          {activeSection === "media" ? (
+          <div id="create-post-media-panel">
           {pendingImages.length > 0 ? (
             <div className="rounded-xl border border-neutral-800/85 bg-black/25 p-3 light:border-zinc-200 light:bg-zinc-50">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Fotos</p>
@@ -287,37 +328,37 @@ export function CreatePostForm({
               ) : null}
             </div>
           ) : (
-            <Button type="button" disabled={mediaBusy} onClick={openFilePicker}>
-              Añadir foto (obligatoria)
-            </Button>
+            <button
+              type="button"
+              disabled={mediaBusy}
+              onClick={openFilePicker}
+              className="flex min-h-[150px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-600 bg-black/20 transition hover:border-goi-gold/50 light:border-zinc-300 light:bg-zinc-50 light:hover:border-goi-gold/60"
+            >
+              <span className="text-3xl font-light leading-none text-goi-gold">+</span>
+              <span className="text-sm font-semibold text-neutral-300 light:text-zinc-700">Añadir fotos</span>
+            </button>
           )}
+          </div>
+          ) : null}
 
-          {onChangeSessionId ? (
+          {activeSection === "content" ? (
+          <>
+          {onChangeSessionId && sessionPicker ? (
+            <div id="create-post-session-panel">
             <CreatePostSessionField
-              sessions={sessions}
+              picker={sessionPicker}
               selectedSessionId={selectedSessionId}
+              selectedSession={sessionPicker.getSession(selectedSessionId)}
               onChangeSessionId={onChangeSessionId}
               open={sessionPickerOpen}
               onOpenChange={setSessionPickerOpen}
             />
+            </div>
           ) : null}
 
           <label id="create-post-caption-panel" className="grid gap-2 font-semibold">
             Pie de foto
             <span className="text-xs font-normal text-neutral-500">Opcional si hay foto. Escribe @ para mencionar.</span>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_TEMPLATES.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  className="rounded-full border border-neutral-700 bg-neutral-900/80 px-2.5 py-1 text-[11px] font-semibold text-neutral-300 hover:border-goi-gold/60 hover:text-goi-gold light:border-zinc-300 light:bg-zinc-100 light:text-zinc-700"
-                  onClick={() => onApplyTemplate?.(template.text)}
-                  disabled={mediaBusy}
-                >
-                  {template.label}
-                </button>
-              ))}
-            </div>
             <MentionableTextarea
               value={content}
               onChange={onChangeContent}
@@ -336,8 +377,14 @@ export function CreatePostForm({
               </div>
             ) : null}
           </label>
+          </>
+          ) : null}
 
-          <fieldset className="grid gap-1.5 rounded-xl border border-neutral-800/85 bg-black/25 p-3 light:border-zinc-200 light:bg-zinc-50">
+          {activeSection === "privacy" ? (
+          <fieldset
+            id="create-post-visibility-panel"
+            className="grid gap-1.5 rounded-xl border border-neutral-800/85 bg-black/25 p-3 light:border-zinc-200 light:bg-zinc-50"
+          >
             <legend className="font-semibold">Visibilidad</legend>
             <select
               className="goi-field"
@@ -355,6 +402,7 @@ export function CreatePostForm({
               {currentHint}
             </p>
           </fieldset>
+          ) : null}
         </div>
       </div>
 
@@ -385,13 +433,15 @@ export function CreatePostForm({
         </div>
       ) : null}
 
-      {submitHint ? <p className="text-xs text-amber-200/90 light:text-amber-800">{submitHint}</p> : null}
+      {submitHint && !hideSubmit ? <p className="text-xs text-amber-200/90 light:text-amber-800">{submitHint}</p> : null}
 
-      <div className="flex justify-end pt-1">
-        <Button type="submit" disabled={submitDisabled || !canSubmit} className="w-full sm:w-auto">
-          Publicar
-        </Button>
-      </div>
+      {!hideSubmit ? (
+        <div className="hidden justify-end pt-1 md:flex">
+          <Button type="submit" disabled={submitDisabled || !canSubmit} className="w-full sm:w-auto">
+            Publicar
+          </Button>
+        </div>
+      ) : null}
     </form>
   );
 }

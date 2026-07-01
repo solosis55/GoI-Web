@@ -257,4 +257,52 @@ describe("workout sessions API", () => {
     expect(response.status).toBe(403);
     expect(response.body.code).toBe("WORKOUT_SESSION_FORBIDDEN");
   });
+
+  it("lists sessions for picker with search, pagination and linked flag", async () => {
+    const token = await registerAndLogin("picker.owner@test.com", "pickerowner", "123456");
+
+    const w1 = await request(app)
+      .post("/api/workouts")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "Push Day", description: "", exerciseIds: [SAMPLE_EXERCISE_ID] })
+      .expect(201);
+    const w2 = await request(app)
+      .post("/api/workouts")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "Pull Day", description: "", exerciseIds: [SAMPLE_EXERCISE_ID] })
+      .expect(201);
+
+    const s1 = await request(app)
+      .post("/api/workout-sessions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ workoutId: w1.body.id, notes: "Press banca PR" })
+      .expect(201);
+    await request(app)
+      .post("/api/workout-sessions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ workoutId: w2.body.id, notes: "Remo" })
+      .expect(201);
+
+    await request(app)
+      .post("/api/posts")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ content: "Post training", format: "training", sessionId: s1.body.id })
+      .expect(201);
+
+    const page1 = await request(app)
+      .get("/api/workout-sessions/picker?limit=1&includeLinked=true")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(page1.body.sessions).toHaveLength(1);
+    expect(page1.body.hasMore).toBe(true);
+    expect(page1.body.routineOptions.length).toBeGreaterThanOrEqual(2);
+
+    const search = await request(app)
+      .get("/api/workout-sessions/picker?q=remo")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(search.body.sessions.some((s: { workoutTitle: string }) => s.workoutTitle === "Pull Day")).toBe(true);
+  });
 });

@@ -5,6 +5,7 @@ import { canViewWorkoutSession } from "../services/sessionAccess.js";
 import { normalizeWorkoutSessionSnapshot } from "../services/sessionSnapshotNormalize.js";
 import { resolveSessionSnapshotForApi } from "../services/sessionSnapshotDerive.js";
 import { isLengthBetween, sanitizeText } from "../services/validation.js";
+import { querySessionsForPicker } from "../services/sessionPickerQuery.js";
 
 const NOTES_MAX = 500;
 
@@ -56,6 +57,36 @@ export function listWorkoutSessions(_req: Request, res: Response) {
     .map(mapSessionWithTitle);
 
   res.json(sessions);
+}
+
+export function listSessionsForPicker(req: Request, res: Response) {
+  const authUserId = String(res.locals.authUserId ?? "");
+  if (!authUserId) {
+    sendError(res, 401, "AUTH_HEADER_INVALID", "missing auth");
+    return;
+  }
+
+  const q = typeof req.query.q === "string" ? req.query.q : undefined;
+  const workoutId = typeof req.query.workoutId === "string" ? req.query.workoutId : undefined;
+  const from = typeof req.query.from === "string" ? req.query.from : undefined;
+  const to = typeof req.query.to === "string" ? req.query.to : undefined;
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+  const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : undefined;
+  const includeLinked =
+    req.query.includeLinked === undefined || req.query.includeLinked === "1" || req.query.includeLinked === "true";
+
+  const result = querySessionsForPicker({
+    userId: authUserId,
+    q,
+    workoutId,
+    from,
+    to,
+    cursor,
+    limit: Number.isFinite(limitRaw) ? limitRaw : undefined,
+    includeLinked,
+  });
+
+  res.json(result);
 }
 
 export function getWorkoutSession(req: Request, res: Response) {

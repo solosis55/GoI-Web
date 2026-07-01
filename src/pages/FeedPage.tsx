@@ -25,6 +25,12 @@ import {
 import { CreatePostTrainingForm } from "../components/feed/CreatePostTrainingForm";
 import { CreatePostFormatChooser } from "../components/feed/CreatePostFormatChooser";
 import { CreatePostFormatSegment } from "../components/feed/CreatePostFormatSegment";
+import { CreatePostComposerHeader } from "../components/feed/composer/CreatePostComposerHeader";
+import { CreatePostSectionNav } from "../components/feed/composer/CreatePostToolbar";
+import type {
+  CreatePostComposerActions,
+  CreatePostComposerSection,
+} from "../components/feed/composer/createPostComposerActions";
 import { FeedNotificationsBell } from "../components/feed/FeedNotificationsBell";
 import { FeedModeTabs, type FeedScope } from "../components/feed/FeedModeTabs";
 import { FeedReportModal } from "../components/feed/FeedReportModal";
@@ -63,6 +69,7 @@ import {
   writePostCreateDraft,
 } from "../utils/postCreateDraft";
 import { useMentionRecents } from "../hooks/useMentionRecents";
+import { usePostSessionPicker } from "../hooks/usePostSessionPicker";
 import { useNearViewport } from "../hooks/useNearViewport";
 import {
   appendLocalReport,
@@ -214,6 +221,8 @@ export function FeedPage({
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [content, setContent] = useState("");
   const [composerFormat, setComposerFormat] = useState<PostFormat | null>(null);
+  const composerActionsRef = useRef<CreatePostComposerActions | null>(null);
+  const [composerActiveSection, setComposerActiveSection] = useState<CreatePostComposerSection>("content");
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [postVisibility, setPostVisibility] = useState<"public" | "followers" | "private">("public");
   const [draftImages, setDraftImages] = useState<PendingPostImage[]>([]);
@@ -457,20 +466,40 @@ export function FeedPage({
     [user?.defaultPostVisibility],
   );
 
-  const myWorkoutSessions = useMemo(
-    () => (user ? workoutSessions.filter((s) => s.userId === user.id) : []),
-    [workoutSessions, user],
+  const postSessionPicker = usePostSessionPicker(user?.id);
+
+  const composerSessionOptions = useMemo(
+    () => postSessionPicker.resolveAvailable(selectedSessionId || null),
+    [postSessionPicker, selectedSessionId],
   );
 
   const selectedSessionWorkoutTitle = useMemo(() => {
-    const match = myWorkoutSessions.find((s) => s.id === selectedSessionId);
+    const match = postSessionPicker.getSession(selectedSessionId);
     return match?.workoutTitle ?? "";
-  }, [myWorkoutSessions, selectedSessionId]);
+  }, [postSessionPicker, selectedSessionId]);
 
   const composerValidation = useMemo(
     () => validateCreatePost(content, draftImages.length, composerFormat ?? "standard"),
     [content, draftImages.length, composerFormat],
   );
+
+  const handleRegisterComposerActions = useCallback((actions: CreatePostComposerActions) => {
+    composerActionsRef.current = actions;
+  }, []);
+
+  const runComposerSectionAction = useCallback((section: CreatePostComposerSection) => {
+    setComposerActiveSection(section);
+    const handlers = composerActionsRef.current;
+    if (!handlers) return;
+    if (section === "content") handlers.openContent();
+    else if (section === "media") handlers.openMedia();
+    else if (section === "privacy") handlers.openPrivacy();
+  }, []);
+
+  useEffect(() => {
+    if (!mobileComposerOpen || !composerFormat || !user?.id) return;
+    void postSessionPicker.refresh();
+  }, [mobileComposerOpen, composerFormat, user?.id, postSessionPicker.refresh]);
 
   const composerHasPendingChanges = useMemo(() => {
     if (!composerFormat) return false;
@@ -499,7 +528,21 @@ export function FeedPage({
     setDraftImages([]);
     setComposerFormat(null);
     setComposerHydrated(false);
+    setComposerActiveSection("content");
+    composerActionsRef.current = null;
   }, [defaultPostVisibility, composerFormat, user?.id]);
+
+  const handleDiscardComposerDraft = useCallback(() => {
+    if (
+      !window.confirm(
+        "¿Descartar borrador de publicación? Se borrará texto, fotos y selección actual.",
+      )
+    ) {
+      return;
+    }
+    resetComposer();
+    setMobileComposerOpen(false);
+  }, [resetComposer]);
 
   const openComposer = useCallback(() => {
     setComposerFormat(null);
@@ -527,6 +570,7 @@ export function FeedPage({
         }
       }
       setComposerHydrated(false);
+      setComposerActiveSection("content");
       setComposerFormat(next);
     },
     [
@@ -542,6 +586,7 @@ export function FeedPage({
 
   const handleSelectComposerFormat = useCallback((format: PostFormat) => {
     setComposerHydrated(false);
+    setComposerActiveSection("content");
     setComposerFormat(format);
   }, []);
 
@@ -1566,46 +1611,34 @@ export function FeedPage({
                 aria-modal="true"
                 aria-label="Crear publicación"
               >
-                <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <h3 className="text-base font-semibold text-neutral-100 light:text-zinc-900">Nueva publicación</h3>
-                    <div className="flex items-center gap-2">
-                      {composerFormat ? (
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 items-center rounded-lg border border-red-700/80 bg-red-950/40 px-3 text-sm font-medium text-red-300 hover:bg-red-950/60 light:border-red-600/80 light:bg-red-50 light:text-red-800"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "¿Descartar borrador de publicación? Se borrará texto, fotos y selección actual.",
-                            )
-                          ) {
-                            resetComposer();
-                            setMobileComposerOpen(false);
-                          }
-                        }}
-                      >
-                        Descartar borrador
-                      </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="inline-flex min-h-11 items-center rounded-lg border border-neutral-700 px-3 text-sm text-neutral-300 light:border-zinc-300 light:text-zinc-700"
-                        onClick={requestCloseComposer}
-                      >
-                        Cerrar
-                      </button>
-                    </div>
+                <CreatePostComposerHeader
+                  composerFormat={composerFormat}
+                  canPublish={composerValidation.canSubmit}
+                  publishing={createBusy}
+                  publishDisabled={photoBusy || createBusy}
+                  publishHint={composerValidation.hint || undefined}
+                  onCancel={requestCloseComposer}
+                  onDiscardDraft={handleDiscardComposerDraft}
+                  showDiscardDraft={composerHasPendingChanges && Boolean(composerFormat)}
+                />
+
+                {composerFormat ? (
+                  <div className="shrink-0 space-y-1.5 border-b border-neutral-800/60 px-3 pb-2 pt-1 light:border-zinc-200 sm:px-4">
+                    <CreatePostFormatSegment value={composerFormat} onChange={requestFormatChange} />
+                    <CreatePostSectionNav
+                      hasSession={Boolean(selectedSessionId)}
+                      imageCount={draftImages.length}
+                      activeSection={composerActiveSection}
+                      onPress={runComposerSectionAction}
+                    />
                   </div>
-                  {composerFormat ? (
-                    <div className="mb-3">
-                      <CreatePostFormatSegment value={composerFormat} onChange={requestFormatChange} />
-                    </div>
-                  ) : null}
+                ) : null}
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
                   <div
                     className={[
                       "grid gap-3 transition-all duration-200 ease-out",
-                      cropTarget && composerFormat ? "lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]" : "grid-cols-1",
+                      cropTarget && composerFormat ? "md:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]" : "grid-cols-1",
                     ].join(" ")}
                   >
                     <div className="min-w-0">
@@ -1634,15 +1667,18 @@ export function FeedPage({
                           transferState={composerTransferState}
                           mediaBusy={photoBusy || createBusy}
                           onMentionPick={handleMentionPicked}
-                          onApplyTemplate={handleApplyComposerTemplate}
                           mentionCandidates={mentionPickList}
                           previewAuthor={
                             user ? { username: user.username, avatarUrl: user.avatarUrl ?? "" } : undefined
                           }
                           mentionDirectory={mentionDirectory}
                           selectedSessionId={selectedSessionId}
-                          sessions={myWorkoutSessions}
+                          sessionPicker={postSessionPicker}
                           onChangeSessionId={setSelectedSessionId}
+                          hideSubmit
+                          onRegisterActions={handleRegisterComposerActions}
+                          activeSection={composerActiveSection}
+                          onActiveSectionChange={setComposerActiveSection}
                         />
                       ) : (
                         <CreatePostTrainingForm
@@ -1650,7 +1686,8 @@ export function FeedPage({
                           visibility={postVisibility}
                           pendingImages={draftImages}
                           selectedSessionId={selectedSessionId}
-                          sessions={myWorkoutSessions}
+                          sessions={composerSessionOptions}
+                          sessionPicker={postSessionPicker}
                           onChangeContent={setContent}
                           onChangeVisibility={setPostVisibility}
                           onChangeSessionId={setSelectedSessionId}
@@ -1672,6 +1709,10 @@ export function FeedPage({
                             user ? { username: user.username, avatarUrl: user.avatarUrl ?? "" } : undefined
                           }
                           mentionDirectory={mentionDirectory}
+                          hideSubmit
+                          onRegisterActions={handleRegisterComposerActions}
+                          activeSection={composerActiveSection}
+                          onActiveSectionChange={setComposerActiveSection}
                         />
                       )}
                     </div>

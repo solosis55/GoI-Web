@@ -691,3 +691,16 @@ export function createComment(req: Request, res: Response) {
     authorAvatarUrl: commentAuthor?.avatarUrl ?? "",
   });
 }
+
+/** IDs de sesiones ya vinculadas a un post del usuario autenticado. */
+export function listLinkedSessionIds(req: Request, res: Response) {
+  const userId = req.userId;
+  if (!userId) {
+    sendError(res, 401, "UNAUTHORIZED", "authentication required");
+    return;
+  }
+  const sessionIds = store.posts
+    .filter((p) => p.userId === userId && p.sessionId)
+    .map((p) => p.sessionId as string);
+  res.json({ sessionIds });
+}

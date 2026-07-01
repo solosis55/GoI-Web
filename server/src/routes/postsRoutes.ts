@@ -6,6 +6,7 @@ import {
   getPostById,
   listNotifications,
   listFeed,
+  listLinkedSessionIds,
   listPostLikes,
   listPostsByUser,
   markNotificationsRead,
@@ -18,6 +19,7 @@ import { runPostCreateUpload } from "../middleware/postImageUpload.js";
 const postsRoutes = Router();
 
 postsRoutes.get("/feed", requireAuth, listFeed);
+postsRoutes.get("/linked-session-ids", requireAuth, listLinkedSessionIds);
 postsRoutes.get("/notifications", requireAuth, listNotifications);
 postsRoutes.post("/notifications/read", requireAuth, markNotificationsRead);
 postsRoutes.get("/by-user/:targetUserId", requireAuth, listPostsByUser);

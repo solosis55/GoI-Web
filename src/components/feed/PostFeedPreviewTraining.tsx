@@ -25,6 +25,8 @@ type PostFeedPreviewTrainingProps = {
   onPressLinkSession?: () => void;
   onPressEditCaption?: () => void;
   onPressAddMedia?: () => void;
+  /** Composer: preview reducida junto al panel de edición. */
+  compact?: boolean;
 };
 
 /** Vista previa feed training — caption → sesión → foto inset (paridad App). */
@@ -45,6 +47,7 @@ export function PostFeedPreviewTraining({
   onPressLinkSession,
   onPressEditCaption,
   onPressAddMedia,
+  compact = false,
 }: PostFeedPreviewTrainingProps) {
   const caption = content.trim();
   const visibilityLabel =
@@ -52,14 +55,17 @@ export function PostFeedPreviewTraining({
 
   return (
     <article
-      className="feed-post-card flex flex-col overflow-hidden rounded-2xl border"
+      className={[
+        "feed-post-card flex flex-col overflow-hidden rounded-2xl border",
+        compact ? "w-full shadow-sm" : "",
+      ].join(" ")}
       aria-label="Vista previa training"
     >
-      <div className="flex items-start gap-3 p-4 sm:p-5 sm:pb-3">
-        <Avatar src={avatarUrl} alt={username} size={46} />
-        <div className="min-w-0 flex-1 border-b border-neutral-800/40 pb-3 light:border-zinc-200/75">
+      <div className={compact ? "flex items-start gap-3 p-4 pb-2" : "flex items-start gap-3 p-4 sm:p-5 sm:pb-3"}>
+        <Avatar src={avatarUrl} alt={username} size={compact ? 42 : 46} />
+        <div className={compact ? "min-w-0 flex-1 border-b border-neutral-800/40 pb-2.5 light:border-zinc-200/75" : "min-w-0 flex-1 border-b border-neutral-800/40 pb-3 light:border-zinc-200/75"}>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-[15px] font-semibold text-neutral-100 light:text-zinc-900">
+            <span className={compact ? "text-[14px] font-semibold text-neutral-100 light:text-zinc-900" : "text-[15px] font-semibold text-neutral-100 light:text-zinc-900"}>
               {username}
               <span className="font-normal text-neutral-500"> (tu)</span>
             </span>
@@ -92,12 +98,12 @@ export function PostFeedPreviewTraining({
         disabled={!editorMode || !onPressEditCaption}
         onClick={onPressEditCaption}
         className={[
-          "mx-4 rounded-xl px-3.5 py-3 text-left sm:mx-5",
+          compact ? "mx-4 rounded-xl px-3.5 py-2.5 text-left" : "mx-4 rounded-xl px-3.5 py-3 text-left sm:mx-5",
           editorMode ? "border border-goi-gold/25 hover:bg-goi-gold/5" : "border-transparent",
         ].join(" ")}
       >
         {caption ? (
-          <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-neutral-200 light:text-zinc-800">
+          <div className={compact ? "whitespace-pre-wrap text-[14px] leading-relaxed text-neutral-200 light:text-zinc-800" : "whitespace-pre-wrap text-[15px] leading-relaxed text-neutral-200 light:text-zinc-800"}>
             {mentionDirectory ? (
               <MentionHighlighted text={content} userDirectory={mentionDirectory} />
             ) : (
@@ -125,7 +131,7 @@ export function PostFeedPreviewTraining({
         />
       </div>
 
-      {editorMode ? (
+      {editorMode && !compact ? (
         <p className="px-4 pb-3 text-center text-[11px] font-semibold uppercase tracking-wide text-goi-gold-dim sm:px-5">
           Vista previa del feed
         </p>

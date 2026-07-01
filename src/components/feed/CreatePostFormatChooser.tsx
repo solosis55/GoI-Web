@@ -13,12 +13,20 @@ const OPTIONS: { format: PostFormat; title: string; bullets: string[] }[] = [
   {
     format: "standard",
     title: "Publicación",
-    bullets: ["Foto obligatoria", "Pie de foto bajo los iconos", "Estilo feed clásico"],
+    bullets: [
+      "Foto cuadrada obligatoria",
+      "Caption bajo los iconos del feed",
+      "Entreno vinculado opcional (icono mancuerna)",
+    ],
   },
   {
     format: "training",
     title: "Training",
-    bullets: ["Sesión de entreno protagonista", "Comentario opcional", "Foto opcional al final"],
+    bullets: [
+      "Tarjeta de sesión como protagonista",
+      "Comentario sobre el entreno",
+      "Foto opcional al final del post",
+    ],
   },
 ];
 
@@ -37,7 +45,7 @@ export function CreatePostFormatChooser({
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         {OPTIONS.map((opt) => {
           const suggested = suggestedFormat === opt.format;
           return (

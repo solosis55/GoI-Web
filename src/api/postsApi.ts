@@ -44,6 +44,12 @@ export async function getFeedPage(
   return resolveFeedPagePagination(normalized, limit);
 }
 
+export function getLinkedSessionIds() {
+  return apiFetch<{ sessionIds: string[] }>("/posts/linked-session-ids").then(
+    (r) => r.sessionIds ?? [],
+  );
+}
+
 function appendCreatePostFields(form: FormData, input: CreatePostInput) {
   form.append("content", input.content);
   form.append("format", input.format ?? "standard");

@@ -17,13 +17,15 @@ type PostMediaGalleryProps = {
   feedInteractive?: boolean;
   /** Training inset: tope de altura de la imagen (px). */
   insetMaxHeight?: number;
+  /** Hero en preview/composer: rellena contenedor cuadrado con object-cover. */
+  heroCover?: boolean;
 };
 
 function isImage(m: PostMediaItem): m is PostMediaItem & { type: "image" } {
   return m.type === "image";
 }
 
-export function PostMediaGallery({ media, layout = "inline", feedInteractive = false, insetMaxHeight }: PostMediaGalleryProps) {
+export function PostMediaGallery({ media, layout = "inline", feedInteractive = false, insetMaxHeight, heroCover = false }: PostMediaGalleryProps) {
   const resolvedMedia = useMemo(() => resolvePostMedia(media), [media]);
   const imageItems = useMemo(() => resolvedMedia.filter(isImage), [resolvedMedia]);
   const urls = useMemo(() => imageItems.map((i) => i.url), [imageItems]);
@@ -84,18 +86,30 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
 
   /** Hero del feed: carrusel + lightbox (no enlaces directos al asset). */
   if (feedInteractive && hero && urls.length > 0) {
-    const shellClass = insetMaxHeight
+    const shellClass = heroCover
+      ? "h-full w-full border-0 bg-transparent shadow-none"
+      : insetMaxHeight
       ? "w-full border-0 bg-transparent shadow-none"
       : [
           "mt-0 w-full rounded-none border-0 border-t border-neutral-800/65 bg-neutral-950/45 shadow-none light:border-zinc-200/90 light:bg-zinc-100/60",
         ].join(" ");
 
-    const heroImgStyle: CSSProperties = {
-      maxHeight: insetMaxHeight ? `${insetMaxHeight}px` : "min(92vh, 1400px)",
-      width: "100%",
-      height: "auto",
-      objectFit: insetMaxHeight ? "cover" : undefined,
-    };
+    const heroImgStyle: CSSProperties = heroCover
+      ? { width: "100%", height: "100%", objectFit: "cover" }
+      : {
+          maxHeight: insetMaxHeight ? `${insetMaxHeight}px` : "min(92vh, 1400px)",
+          width: "100%",
+          height: "auto",
+          objectFit: insetMaxHeight ? "cover" : undefined,
+        };
+
+    const heroButtonClass = heroCover
+      ? "group relative block h-full w-full cursor-zoom-in border-0 bg-neutral-950 p-0 text-left outline-none ring-goi-gold/20 transition hover:brightness-[1.03] focus-visible:ring-2 focus-visible:ring-goi-gold/45 light:bg-zinc-100 healthy:ring-goi-gold/18 healthy:focus-visible:ring-goi-gold/34"
+      : "group relative block w-full cursor-zoom-in border-0 bg-neutral-950 p-0 text-left outline-none ring-goi-gold/20 transition hover:brightness-[1.03] focus-visible:ring-2 focus-visible:ring-goi-gold/45 light:bg-zinc-100 healthy:ring-goi-gold/18 healthy:focus-visible:ring-goi-gold/34";
+
+    const heroImgClass = heroCover
+      ? "block h-full w-full bg-neutral-950 object-cover transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100"
+      : "block h-auto w-full max-w-full bg-neutral-950 transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100";
 
     return (
       <>
@@ -103,7 +117,7 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
           {urls.length === 1 ? (
             <button
               type="button"
-              className="group relative block w-full cursor-zoom-in border-0 bg-neutral-950 p-0 text-left outline-none ring-goi-gold/20 transition hover:brightness-[1.03] focus-visible:ring-2 focus-visible:ring-goi-gold/45 light:bg-zinc-100 healthy:ring-goi-gold/18 healthy:focus-visible:ring-goi-gold/34"
+              className={heroButtonClass}
               onClick={() => openLightbox(0)}
               aria-label="Ampliar foto"
             >
@@ -111,21 +125,24 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
                 src={urls[0]}
                 alt="Foto de la publicación"
                 loading="lazy"
-                className="block h-auto w-full max-w-full bg-neutral-950 transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100"
+                className={heroImgClass}
                 style={heroImgStyle}
               />
             </button>
           ) : (
-            <div className="relative">
+            <div className={heroCover ? "relative h-full" : "relative"}>
               <div
                 ref={scrollerRef}
-                className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className={[
+                  "flex snap-x snap-mandatory overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                  heroCover ? "h-full" : "",
+                ].join(" ")}
               >
                 {urls.map((url, index) => (
-                  <div key={`${index}-${url.slice(0, 24)}`} className="w-full shrink-0 snap-center snap-always">
+                  <div key={`${index}-${url.slice(0, 24)}`} className={heroCover ? "h-full w-full shrink-0 snap-center snap-always" : "w-full shrink-0 snap-center snap-always"}>
                     <button
                       type="button"
-                      className="group relative block w-full cursor-zoom-in border-0 bg-neutral-950 p-0 text-left outline-none ring-goi-gold/20 transition hover:brightness-[1.03] focus-visible:ring-2 focus-visible:ring-goi-gold/45 light:bg-zinc-100 healthy:ring-goi-gold/18 healthy:focus-visible:ring-goi-gold/34"
+                      className={heroButtonClass}
                       onClick={() => openLightbox(index)}
                       aria-label={`Foto ${index + 1} de ${urls.length}, ampliar`}
                     >
@@ -133,7 +150,7 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
                         src={url}
                         alt={`Foto ${index + 1} de ${urls.length}`}
                         loading={index === 0 ? "eager" : "lazy"}
-                        className="block h-auto w-full max-w-full bg-neutral-950 transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100"
+                        className={heroImgClass}
                         style={heroImgStyle}
                       />
                     </button>
