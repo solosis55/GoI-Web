@@ -22,6 +22,7 @@ import { WorkoutEditorPage, type WorkoutEditorMode } from "./pages/WorkoutEditor
 import { WorkoutsPage } from "./pages/WorkoutsPage";
 import type { Workout } from "./types/workout";
 import { clearWorkoutCreateDraft } from "./utils/workoutCreateDraft";
+import { SESSION_EXPIRED_STORAGE_KEY } from "./constants/storageKeys";
 
 const TAB_STORAGE_KEY = "goi:activeTab";
 type ActiveTab = "feed" | "profile" | "settings" | "statistics" | "workouts";
@@ -83,8 +84,16 @@ function authDeepLinkInUrl(): boolean {
   }
 }
 
+function sessionExpiredPending(): boolean {
+  try {
+    return Boolean(sessionStorage.getItem(SESSION_EXPIRED_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
 function readAuthWelcomePhaseInitial(): AuthWelcomePhase {
-  return authDeepLinkInUrl() ? "form" : "splash";
+  return authDeepLinkInUrl() || sessionExpiredPending() ? "form" : "splash";
 }
 
 function AppContent() {
@@ -168,7 +177,7 @@ function AppContent() {
       setCatalogFromEditor(false);
       setExerciseDetailFromEditor(false);
       setExerciseDetailReturnTarget("catalog");
-      if (!authDeepLinkInUrl()) {
+      if (!authDeepLinkInUrl() && !sessionExpiredPending()) {
         setAuthWelcomePhase("splash");
       }
     }

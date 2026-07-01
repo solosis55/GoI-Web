@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AUTH_EXPIRED_EVENT } from "../api/client";
-import { AUTH_STORAGE_KEY } from "../constants/storageKeys";
+import { AUTH_STORAGE_KEY, SESSION_EXPIRED_STORAGE_KEY } from "../constants/storageKeys";
 import type { SafeUser } from "../types/auth";
 import { mergeSafeUser } from "../utils/safeUserDefaults";
 
@@ -36,7 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SafeUser | null>(stored.user);
 
   useEffect(() => {
-    function handleAuthExpired() {
+    function handleAuthExpired(event: Event) {
+      const code = (event as CustomEvent<{ code?: string }>).detail?.code;
+      try {
+        sessionStorage.setItem(
+          SESSION_EXPIRED_STORAGE_KEY,
+          code === "AUTH_SESSION_STALE" ? "stale" : "expired",
+        );
+      } catch {
+        /* ignore */
+      }
       setToken(null);
       setUser(null);
       localStorage.removeItem(AUTH_STORAGE_KEY);

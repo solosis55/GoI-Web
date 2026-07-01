@@ -14,6 +14,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { StatusMessage } from "../components/ui/StatusMessage";
 import { useAuth } from "../context/AuthContext";
+import { SESSION_EXPIRED_STORAGE_KEY } from "../constants/storageKeys";
 import { getErrorMessage } from "../utils/errorMessages";
 
 type AuthView =
@@ -53,6 +54,26 @@ export function AuthPage() {
         window.clearTimeout(rateLimitTimeoutRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const flag = sessionStorage.getItem(SESSION_EXPIRED_STORAGE_KEY);
+      if (!flag) return;
+      sessionStorage.removeItem(SESSION_EXPIRED_STORAGE_KEY);
+      setView("login");
+      setMessage("");
+      setError(
+        flag === "stale"
+          ? getErrorMessage(
+              new ApiError("session stale", 401, "AUTH_SESSION_STALE"),
+              "Tu sesión ya no coincide con el servidor. Inicia sesión otra vez.",
+            )
+          : "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+      );
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {

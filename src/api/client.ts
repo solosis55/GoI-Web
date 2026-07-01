@@ -163,7 +163,9 @@ export async function apiFetch<T>(path: string, options?: ApiFetchOptions): Prom
     const code = hasServerCode ? data.code! : "API_ERROR";
     const apiError = new ApiError(message, response.status, code);
     if (shouldExpireSession(apiError.status, apiError.code)) {
-      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+      window.dispatchEvent(
+        new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { code: apiError.code } }),
+      );
     }
     throw apiError;
   }
