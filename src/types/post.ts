@@ -10,6 +10,7 @@ export type Post = {
   content: string;
   format?: PostFormat;
   media?: PostMediaItem[];
+  hasMedia?: boolean;
   sessionId: string | null;
   workoutId: string | null;
   visibility: "public" | "followers" | "private";

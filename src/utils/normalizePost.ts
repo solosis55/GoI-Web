@@ -14,6 +14,10 @@ export function normalizePost(raw: Post): Post {
     likedByMe: raw.likedByMe ?? false,
     comments: Array.isArray(raw.comments) ? raw.comments.map(normalizeComment) : [],
     media: Array.isArray(raw.media) ? raw.media : undefined,
+    hasMedia:
+      raw.hasMedia === true ||
+      (raw as { has_media?: boolean }).has_media === true ||
+      (raw.media?.length ?? 0) > 0,
   };
 }
 

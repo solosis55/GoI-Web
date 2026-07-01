@@ -127,7 +127,9 @@ export async function apiFetch<T>(path: string, options?: ApiFetchOptions): Prom
       ...fetchOptions,
       signal,
       headers: {
-        "Content-Type": "application/json",
+        ...(fetchOptions?.body instanceof FormData
+          ? {}
+          : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(fetchOptions?.headers ?? {}),
       },

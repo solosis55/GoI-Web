@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MentionPickUser } from "../../utils/mentionAutocomplete";
 import { Button } from "../ui/Button";
 import { MentionableTextarea } from "./MentionableTextarea";
-import type { Workout } from "../../types/workout";
+import type { WorkoutSessionWithTitle } from "../../types/workoutSession";
 import type { CreatePostInput, PostMediaItem } from "../../types/post";
 import { POST_IMAGE_MAX_FILES } from "../../utils/postImages";
 import { visibilityBadgeClasses } from "../../utils/visibilityBadgeClasses";
@@ -22,12 +22,13 @@ export type ComposerTransferState = {
 
 type CreatePostFormProps = {
   content: string;
-  selectedWorkoutId: string;
+  selectedSessionId: string;
   visibility: Visibility;
-  workouts: Workout[];
+  /** Sesiones del usuario para post tipo training. */
+  sessions: WorkoutSessionWithTitle[];
   pendingImages: PendingPostImage[];
   onChangeContent: (value: string) => void;
-  onChangeWorkoutId: (value: string) => void;
+  onChangeSessionId: (value: string) => void;
   onChangeVisibility: (value: Visibility) => void;
   onAddImages: (files: FileList | null) => void;
   onRemoveImage: (id: string) => void;
@@ -104,12 +105,12 @@ const VISIBILITY_OPTIONS: { value: Visibility; label: string; hint: string }[] =
 
 export function CreatePostForm({
   content,
-  selectedWorkoutId,
+  selectedSessionId,
   visibility,
-  workouts,
+  sessions,
   pendingImages,
   onChangeContent,
-  onChangeWorkoutId,
+  onChangeSessionId,
   onChangeVisibility,
   onAddImages,
   onRemoveImage,
@@ -135,10 +136,11 @@ export function CreatePostForm({
   const currentHint = VISIBILITY_OPTIONS.find((o) => o.value === visibility)?.hint ?? "";
   const slotsLeft = Math.max(0, POST_IMAGE_MAX_FILES - pendingImages.length);
   const textOptional = pendingImages.length > 0;
-  const selectedWorkoutTitle = workouts.find((w) => w.id === selectedWorkoutId)?.title ?? "";
+  const selectedSessionLabel =
+    sessions.find((s) => s.id === selectedSessionId)?.workoutTitle ?? "";
   const visibilityLabel = VISIBILITY_OPTIONS.find((o) => o.value === visibility)?.label ?? "Todo el mundo";
   const previewText = content.trim();
-  const hasPreview = previewText.length > 0 || pendingImages.length > 0 || selectedWorkoutTitle;
+  const hasPreview = previewText.length > 0 || pendingImages.length > 0 || selectedSessionLabel;
   const isFirstStep = stepIdx === 0;
   const isFinalStep = stepIdx === COMPOSER_STEPS.length - 1;
   const stepTitle = COMPOSER_STEPS[stepIdx]?.label ?? "Editor";
@@ -400,27 +402,22 @@ export function CreatePostForm({
           </fieldset>
 
           <label className="grid gap-1.5 rounded-xl border border-neutral-800/85 bg-black/25 p-3 font-semibold light:border-zinc-200 light:bg-zinc-50">
-            Rutina vinculada (opcional)
+            Entrenamiento vinculado (opcional)
             <select
               className="goi-field"
-              value={selectedWorkoutId}
-              onChange={(event) => onChangeWorkoutId(event.target.value)}
+              value={selectedSessionId}
+              onChange={(event) => onChangeSessionId(event.target.value)}
             >
-              <option value="">Sin rutina</option>
-              {workouts.map((workout) => {
-                const tagHint = (workout.tags ?? []).filter(Boolean);
-                const hint =
-                  tagHint.length > 0
-                    ? ` — ${tagHint.slice(0, 3).join(", ")}${tagHint.length > 3 ? "…" : ""}`
-                    : "";
-                return (
-                  <option key={workout.id} value={workout.id}>
-                    {workout.title}
-                    {hint}
-                  </option>
-                );
-              })}
+              <option value="">Sin sesión</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.workoutTitle} — {new Date(session.performedAt).toLocaleDateString("es-ES")}
+                </option>
+              ))}
             </select>
+            <p className="text-xs font-normal text-neutral-500">
+              Publicación tipo <strong>training</strong> con la sesión registrada.
+            </p>
           </label>
         </>
       ) : null}
@@ -474,14 +471,14 @@ export function CreatePostForm({
                         </div>
                       ) : null}
                       <PostMediaGallery media={previewMediaItems} />
-                      {selectedWorkoutTitle ? (
+                      {selectedSessionLabel ? (
                         <div className="mt-0.5 inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-goi-gold/30 bg-goi-gold/[0.09] px-3 py-1.5 text-xs shadow-[inset_0_1px_0_0_rgba(212,175,55,0.12)] light:border-goi-gold/35 light:bg-goi-gold/[0.1] healthy:bg-goi-gold/[0.08]">
                           <PreviewDumbbellIcon className="size-4 shrink-0 text-goi-gold" />
                           <span className="font-semibold uppercase tracking-wide text-[10px] text-goi-gold-dim">
                             Rutina
                           </span>
                           <span className="text-neutral-600 max-[379px]:hidden">·</span>
-                          <span className="truncate font-medium text-neutral-100 light:text-zinc-900">{selectedWorkoutTitle}</span>
+                          <span className="truncate font-medium text-neutral-100 light:text-zinc-900">{selectedSessionLabel}</span>
                         </div>
                       ) : null}
                       <p className="text-[11px] text-neutral-500">
@@ -519,8 +516,8 @@ export function CreatePostForm({
                 ) : (
                   <p className="mt-1 text-sm text-neutral-500">Sin texto.</p>
                 )}
-                {selectedWorkoutTitle ? (
-                  <p className="mt-1 text-xs text-neutral-400 light:text-zinc-600">Rutina: {selectedWorkoutTitle}</p>
+                {selectedSessionLabel ? (
+                  <p className="mt-1 text-xs text-neutral-400 light:text-zinc-600">Sesión: {selectedSessionLabel}</p>
                 ) : null}
                 {pendingImages.length > 0 ? (
                   <p className="mt-1 text-xs text-neutral-400 light:text-zinc-600">

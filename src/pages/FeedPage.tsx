@@ -53,6 +53,7 @@ import { applyPostTemplate } from "../utils/postComposerTemplates";
 import { compressManyImageFiles, POST_IMAGE_MAX_FILES } from "../utils/postImages";
 import { clearPostCreateDraft, readPostCreateDraft, writePostCreateDraft } from "../utils/postCreateDraft";
 import { useMentionRecents } from "../hooks/useMentionRecents";
+import { useNearViewport } from "../hooks/useNearViewport";
 import {
   appendLocalReport,
   clearMutedUsers,
@@ -66,6 +67,7 @@ import {
 const FEED_SCOPE_STORAGE_KEY = "goi:feedScope";
 const FEED_MODE_LEGACY_KEY = "goi:feedMode";
 const FEED_SIDEBAR_PANEL_KEY = "goi:feedSidebarPanel";
+const FEED_PAGE_SIZE = 20;
 
 function readStoredFeedSidebarPanel(): FeedSidebarPanel {
   try {
@@ -198,7 +200,7 @@ export function FeedPage({
   const [posts, setPosts] = useState<Post[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [content, setContent] = useState("");
-  const [selectedWorkoutId, setSelectedWorkoutId] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState("");
   const [postVisibility, setPostVisibility] = useState<"public" | "followers" | "private">("public");
   const [draftImages, setDraftImages] = useState<PendingPostImage[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -241,6 +243,11 @@ export function FeedPage({
   const [feedSidebarPanel, setFeedSidebarPanel] = useState<FeedSidebarPanel>(() => readStoredFeedSidebarPanel());
   const [pulsePostId, setPulsePostId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMoreFeed, setLoadingMoreFeed] = useState(false);
+  const [feedHasMore, setFeedHasMore] = useState(false);
+  const feedCursorRef = useRef<string | null>(null);
+  const feedHasMoreRef = useRef(false);
+  const loadingMoreFeedRef = useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [composerHydrated, setComposerHydrated] = useState(false);
@@ -371,14 +378,9 @@ export function FeedPage({
   );
   const followerIdSet = useMemo(() => new Set(followerIds), [followerIds]);
 
-  const postsByScope = useMemo(() => {
-    if (feedScope === "all") return posts;
-    return posts.filter((post) => followingIds.includes(post.userId) || post.userId === userId);
-  }, [feedScope, posts, followingIds, userId]);
-
   const postsAfterMute = useMemo(
-    () => postsByScope.filter((p) => !mutedUserIdSet.has(p.userId)),
-    [postsByScope, mutedUserIdSet],
+    () => posts.filter((p) => !mutedUserIdSet.has(p.userId)),
+    [posts, mutedUserIdSet],
   );
 
   const postsFiltered = useMemo(
@@ -453,14 +455,14 @@ export function FeedPage({
     () =>
       content.trim().length > 0 ||
       draftImages.length > 0 ||
-      selectedWorkoutId.length > 0 ||
+      selectedSessionId.length > 0 ||
       postVisibility !== "public",
-    [content, draftImages.length, selectedWorkoutId, postVisibility],
+    [content, draftImages.length, selectedSessionId, postVisibility],
   );
 
   const resetComposer = useCallback(() => {
     setContent("");
-    setSelectedWorkoutId("");
+    setSelectedSessionId("");
     setPostVisibility("public");
     setDraftImages([]);
     clearPostCreateDraft();
@@ -490,7 +492,7 @@ export function FeedPage({
     const draft = readPostCreateDraft(user.id);
     if (draft) {
       setContent(draft.content);
-      setSelectedWorkoutId(draft.selectedWorkoutId);
+      setSelectedSessionId(draft.selectedSessionId);
       setPostVisibility(draft.visibility);
       setMessage("Borrador recuperado.");
     }
@@ -503,9 +505,9 @@ export function FeedPage({
       userId: user.id,
       content,
       visibility: postVisibility,
-      selectedWorkoutId,
+      selectedSessionId,
     });
-  }, [composerHydrated, user?.id, content, postVisibility, selectedWorkoutId]);
+  }, [composerHydrated, user?.id, content, postVisibility, selectedSessionId]);
 
   useEffect(() => {
     try {
@@ -590,14 +592,67 @@ export function FeedPage({
     }
   }, [userId]);
 
-  const loadFeed = useCallback(async () => {
+  const fetchFeedPosts = useCallback(
+    async (scope: FeedScope, mode: "reset" | "more") => {
+      if (!userId) return;
+      if (mode === "more") {
+        if (!feedHasMoreRef.current || loadingMoreFeedRef.current || !feedCursorRef.current) return;
+        loadingMoreFeedRef.current = true;
+        setLoadingMoreFeed(true);
+      } else {
+        setLoading(true);
+        feedCursorRef.current = null;
+      }
+      if (mode === "reset") setError("");
+      try {
+        const cursor = mode === "more" ? feedCursorRef.current : null;
+        const page = await getFeedPage(scope, FEED_PAGE_SIZE, cursor);
+        const newPosts = page.items
+          .filter((item): item is { kind: "post"; post: Post } => item.kind === "post")
+          .map((item) => item.post);
+        setPosts((prev) => {
+          if (mode !== "more") return newPosts;
+          const seen = new Set(prev.map((p) => p.id));
+          const fresh = newPosts.filter((p) => !seen.has(p.id));
+          if (fresh.length === 0) {
+            feedHasMoreRef.current = false;
+            setFeedHasMore(false);
+            feedCursorRef.current = null;
+            return prev;
+          }
+          return [...prev, ...fresh];
+        });
+        if (mode === "more" && newPosts.length > 0) {
+          feedCursorRef.current = page.nextCursor;
+          feedHasMoreRef.current = page.hasMore;
+          setFeedHasMore(page.hasMore);
+        } else if (mode !== "more") {
+          feedCursorRef.current = page.nextCursor;
+          feedHasMoreRef.current = page.hasMore;
+          setFeedHasMore(page.hasMore);
+        }
+      } catch (postsError) {
+        if (mode === "reset") setPosts([]);
+        setError(
+          getErrorMessage(postsError, "No se pudieron cargar las publicaciones (Goi Server / Neon)."),
+        );
+      } finally {
+        if (mode === "more") {
+          loadingMoreFeedRef.current = false;
+          setLoadingMoreFeed(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    },
+    [userId],
+  );
+
+  const loadFeedAuxiliary = useCallback(async () => {
     if (!userId) return;
-    setLoading(true);
-    setError("");
     setMessage("");
     try {
       const [
-        postsResult,
         workoutsResult,
         usersResult,
         followingResult,
@@ -607,7 +662,6 @@ export function FeedPage({
         notifResult,
         storiesResult,
       ] = await Promise.allSettled([
-        getFeedPage("all", 40),
         getWorkouts(),
         getUsers(),
         getFollowing(userId),
@@ -617,19 +671,6 @@ export function FeedPage({
         getNotifications(),
         getStories(),
       ]);
-
-      if (postsResult.status === "fulfilled") {
-        setPosts(
-          postsResult.value.items
-            .filter((item) => item.kind === "post")
-            .map((item) => item.post),
-        );
-      } else {
-        setPosts([]);
-        setError(
-          getErrorMessage(postsResult.reason, "No se pudieron cargar las publicaciones (Goi Server / Neon)."),
-        );
-      }
 
       if (workoutsResult.status === "fulfilled") {
         const mine = workoutsResult.value.filter((workout) => workout.userId === userId);
@@ -665,11 +706,16 @@ export function FeedPage({
         setStoryAuthorsFromApi(storiesResult.value.authors ?? []);
       }
     } catch (loadError) {
-      setError(getErrorMessage(loadError, "No se pudo cargar el feed"));
-    } finally {
-      setLoading(false);
+      setError(getErrorMessage(loadError, "No se pudo cargar datos del feed"));
     }
   }, [userId]);
+
+  const loadMoreFeed = useCallback(() => {
+    void fetchFeedPosts(feedScope, "more");
+  }, [fetchFeedPosts, feedScope]);
+
+  const feedInfiniteEnabled = feedHasMore && postsFiltered.length > 0 && !loadingMoreFeed && !loading;
+  const feedLoadMoreSentinelRef = useNearViewport(() => void loadMoreFeed(), feedInfiniteEnabled);
 
   async function handleToggleFollow(targetUserId: string) {
     if (!userId) return;
@@ -732,8 +778,14 @@ export function FeedPage({
   );
 
   useEffect(() => {
-    void loadFeed();
-  }, [loadFeed]);
+    if (!userId) return;
+    void loadFeedAuxiliary();
+  }, [userId, loadFeedAuxiliary]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void fetchFeedPosts(feedScope, "reset");
+  }, [feedScope, userId, fetchFeedPosts]);
 
   async function handleDraftAddPhotos(files: FileList | null) {
     if (!files?.length) return;
@@ -808,11 +860,13 @@ export function FeedPage({
           };
         });
       }, 180);
+      const sessionId = selectedSessionId.trim() || null;
       const createdPost = await createPost({
         content: trimmed,
-        workoutId: selectedWorkoutId || null,
+        format: sessionId ? "training" : "standard",
+        sessionId,
         visibility: postVisibility,
-        ...(hasMedia ? { media: draftImages.map((img) => ({ type: "image" as const, url: img.dataUrl })) } : {}),
+        ...(hasMedia ? { uploadFiles: draftImages.map((img) => img.uploadFile) } : {}),
       });
       if (uploadProgressTimer) window.clearInterval(uploadProgressTimer);
       setComposerTransferState({
@@ -821,7 +875,7 @@ export function FeedPage({
         message: "Publicación subida correctamente.",
       });
       setContent("");
-      setSelectedWorkoutId("");
+      setSelectedSessionId("");
       setPostVisibility("public");
       setDraftImages([]);
       clearPostCreateDraft();
@@ -1274,6 +1328,22 @@ export function FeedPage({
             ),
           )}
         </ul>
+
+        {feedHasMore && postsFiltered.length > 0 ? (
+          <>
+            <div ref={feedLoadMoreSentinelRef} className="h-px w-full" aria-hidden />
+            <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-200 transition hover:border-goi-gold-dim hover:text-goi-gold light:border-zinc-300 light:text-zinc-800"
+              disabled={loadingMoreFeed}
+              onClick={loadMoreFeed}
+            >
+              {loadingMoreFeed ? "Cargando…" : "Cargar más publicaciones"}
+            </button>
+            </div>
+          </>
+        ) : null}
         </div>
       </section>
 
@@ -1408,12 +1478,12 @@ export function FeedPage({
                     <div className="min-w-0">
                       <CreatePostForm
                         content={content}
-                        selectedWorkoutId={selectedWorkoutId}
+                        selectedSessionId={selectedSessionId}
                         visibility={postVisibility}
-                        workouts={workouts}
+                        sessions={workoutSessions.filter((s) => s.userId === user?.id)}
                         pendingImages={draftImages}
                         onChangeContent={setContent}
-                        onChangeWorkoutId={setSelectedWorkoutId}
+                        onChangeSessionId={setSelectedSessionId}
                         onChangeVisibility={setPostVisibility}
                         onAddImages={(files) => void handleDraftAddPhotos(files)}
                         onRemoveImage={(id) => setDraftImages((list) => list.filter((img) => img.id !== id))}

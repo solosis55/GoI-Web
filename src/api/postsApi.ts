@@ -7,9 +7,11 @@ import type {
   PostComment,
 } from "../types/post";
 import { normalizePost } from "../utils/normalizePost";
+import { resolveFeedPagePagination } from "../utils/resolveFeedPage";
 
 /** Neon puede ir lento; el feed no incluye media en listado. */
 const POSTS_FETCH_TIMEOUT_MS = 25_000;
+const CREATE_POST_TIMEOUT_MS = 120_000;
 
 export type FeedPageResponse = {
   items: { kind: "post"; post: Post }[];
@@ -17,33 +19,65 @@ export type FeedPageResponse = {
   hasMore: boolean;
 };
 
+export type CreatePostPayload = CreatePostInput & {
+  /** Archivos locales (multipart); preferido frente a `media` en JSON. */
+  uploadFiles?: File[];
+};
+
 /** Feed paginado (ligero: sin media en listado). */
-export async function getFeedPage(scope: "all" | "following" = "all", limit = 30) {
+export async function getFeedPage(
+  scope: "all" | "following" = "all",
+  limit = 20,
+  cursor?: string | null,
+) {
   const sp = new URLSearchParams({ scope, limit: String(limit) });
+  if (cursor) sp.set("cursor", cursor);
   const page = await apiFetch<FeedPageResponse>(`/posts/feed?${sp.toString()}`, {
     timeoutMs: POSTS_FETCH_TIMEOUT_MS,
   });
-  return {
+  const normalized = {
     ...page,
     items: page.items.map((item) =>
       item.kind === "post" ? { ...item, post: normalizePost(item.post) } : item,
     ),
   };
+  return resolveFeedPagePagination(normalized, limit);
 }
 
-export async function createPost(input: CreatePostInput) {
-  const sessionId =
-    input.sessionId ??
-    (input.workoutId && /^[0-9a-f-]{36}$/i.test(input.workoutId) ? input.workoutId : null);
+function appendCreatePostFields(form: FormData, input: CreatePostInput) {
+  form.append("content", input.content);
+  form.append("format", input.format ?? "standard");
+  form.append("visibility", input.visibility ?? "public");
+  form.append("sessionId", input.sessionId ?? "");
+}
+
+export async function createPost(input: CreatePostPayload) {
+  const sessionId = input.sessionId ?? null;
+  const format = input.format ?? (sessionId ? "training" : "standard");
+
+  if (input.uploadFiles && input.uploadFiles.length > 0) {
+    const form = new FormData();
+    appendCreatePostFields(form, { ...input, format, sessionId });
+    for (const file of input.uploadFiles) {
+      form.append("files", file, file.name);
+    }
+    return apiFetch<Post>("/posts", {
+      method: "POST",
+      body: form,
+      timeoutMs: CREATE_POST_TIMEOUT_MS,
+    }).then(normalizePost);
+  }
 
   return apiFetch<Post>("/posts", {
     method: "POST",
     body: JSON.stringify({
       content: input.content,
-      format: input.format ?? "standard",
+      format,
       visibility: input.visibility ?? "public",
       sessionId,
+      ...(input.media?.length ? { media: input.media } : {}),
     }),
+    timeoutMs: CREATE_POST_TIMEOUT_MS,
   }).then(normalizePost);
 }
 

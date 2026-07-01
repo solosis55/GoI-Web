@@ -4,7 +4,10 @@ export type PostCreateDraft = {
   userId: string;
   content: string;
   visibility: "public" | "followers" | "private";
-  selectedWorkoutId: string;
+  /** Sesión vinculada (post training). */
+  selectedSessionId: string;
+  /** @deprecated Usar selectedSessionId */
+  selectedWorkoutId?: string;
 };
 
 export function readPostCreateDraft(userId: string): PostCreateDraft | null {
@@ -12,11 +15,7 @@ export function readPostCreateDraft(userId: string): PostCreateDraft | null {
     const raw = sessionStorage.getItem(POST_CREATE_DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PostCreateDraft>;
-    if (
-      typeof parsed.userId !== "string" ||
-      typeof parsed.content !== "string" ||
-      typeof parsed.selectedWorkoutId !== "string"
-    ) {
+    if (typeof parsed.userId !== "string" || typeof parsed.content !== "string") {
       return null;
     }
     if (
@@ -27,11 +26,17 @@ export function readPostCreateDraft(userId: string): PostCreateDraft | null {
       return null;
     }
     if (parsed.userId !== userId) return null;
+    const sessionId =
+      typeof parsed.selectedSessionId === "string"
+        ? parsed.selectedSessionId
+        : typeof parsed.selectedWorkoutId === "string"
+          ? parsed.selectedWorkoutId
+          : "";
     return {
       userId: parsed.userId,
       content: parsed.content,
       visibility: parsed.visibility,
-      selectedWorkoutId: parsed.selectedWorkoutId,
+      selectedSessionId: sessionId,
     };
   } catch {
     return null;
