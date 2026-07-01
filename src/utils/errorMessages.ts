@@ -8,6 +8,8 @@ const codeMessageMap: Record<string, string> = {
     "Confirma tu email antes de entrar. Revisa tu bandeja (y spam) o solicita un nuevo enlace.",
   AUTH_VERIFY_TOKEN_INVALID: "El enlace de verificación no es válido o ha caducado. Solicita uno nuevo.",
   AUTH_VERIFY_INVALID_INPUT: "El enlace de verificación no es válido.",
+  AUTH_EMAIL_SEND_FAILED:
+    "No pudimos enviar el correo de verificación. Pulsa «Reenviar correo» o comprueba que tu dirección esté autorizada en el entorno de pruebas.",
   AUTH_REGISTER_INVALID_INPUT: "Revisa usuario, email y contraseña (mínimo 8 caracteres).",
   AUTH_LOGIN_INVALID_INPUT: "Debes introducir email y contraseña.",
   AUTH_UNAUTHORIZED: "Tu sesión ha caducado. Vuelve a iniciar sesión.",

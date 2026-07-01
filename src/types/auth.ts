@@ -32,11 +32,13 @@ export type AuthResponse = {
 
 export type RegisterResponse = AuthResponse & {
   requiresEmailVerification?: boolean;
+  verificationEmailSent?: boolean;
   devVerificationToken?: string;
 };
 
 export type ResendVerificationResponse = {
   message: string;
+  verificationEmailSent?: boolean;
   devVerificationToken?: string;
 };
 

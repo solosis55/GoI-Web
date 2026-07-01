@@ -194,25 +194,19 @@ export function AuthPage() {
           setPendingEmail(normalizedEmail);
           setPassword("");
           setView("verify-pending");
-          setLoading(false);
-          setResendLoading(true);
-          setError("");
-          setMessage("");
-          try {
-            const resend = await resendVerificationEmail(normalizedEmail);
+          if (reg.verificationEmailSent || reg.devVerificationToken) {
             setMessage(
-              resend.message ||
-                "Te hemos enviado un correo para confirmar tu cuenta. Revisa bandeja y spam.",
+              "Te hemos enviado un correo para confirmar tu cuenta. Revisa bandeja y spam.",
             );
-            if (import.meta.env.DEV && resend.devVerificationToken) {
-              const link = `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(resend.devVerificationToken)}`;
+            if (import.meta.env.DEV && reg.devVerificationToken) {
+              const link = `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(reg.devVerificationToken)}`;
               setDevResetHint(`Modo desarrollo: enlace de verificación:\n${link}`);
             }
-          } catch (resendErr) {
+          } else {
             setMessage("Cuenta creada. Pulsa «Reenviar correo» si no recibes el enlace en unos minutos.");
-            setError(getErrorMessage(resendErr, "No se pudo enviar el correo de verificación"));
-          } finally {
-            setResendLoading(false);
+            setError(
+              "No se pudo enviar el correo de verificación. Si es una cuenta de prueba, autoriza el email en Resend.",
+            );
           }
           return;
         }
@@ -443,6 +437,12 @@ export function AuthPage() {
           <div className="grid gap-3.5">
             {resendLoading ? (
               <p className="m-0 text-sm text-neutral-400 light:text-zinc-600">Enviando correo de verificación…</p>
+            ) : error ? (
+              <p className="m-0 text-sm text-neutral-300 light:text-zinc-700">
+                Cuenta creada para{" "}
+                <strong className="font-semibold text-neutral-100 light:text-zinc-900">{pendingEmail}</strong>.
+                Cuando recibas el enlace, ábrelo para activar tu cuenta (revisa también spam).
+              </p>
             ) : (
               <p className="m-0 text-sm text-neutral-300 light:text-zinc-700">
                 Hemos enviado un enlace a{" "}
