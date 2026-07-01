@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { SocialAccountPanel } from "../components/settings/SocialAccountPanel";
 import { ThemeModePicker } from "../components/ui/ThemeModePicker";
 
 type SettingsPageProps = {
@@ -41,16 +40,6 @@ export function SettingsPage({ onGoToProfile }: SettingsPageProps) {
         <Button type="button" variant="secondary" className="mt-4 w-full sm:w-auto" onClick={onGoToProfile}>
           Ir al perfil
         </Button>
-      </Card>
-
-      <Card tone="dark" className="border-neutral-800/70 light:border-zinc-200">
-        <h2 className="mt-0 text-sm font-semibold text-neutral-100 light:text-zinc-900">Social</h2>
-        <p className="mt-1 text-sm text-neutral-500 light:text-zinc-600">
-          Gestiona solicitudes de seguimiento y cuentas bloqueadas (misma API que la app móvil).
-        </p>
-        <div className="mt-4 border-t border-neutral-800/80 pt-4 light:border-zinc-200">
-          <SocialAccountPanel />
-        </div>
       </Card>
 
       <Card tone="dark" className="border-neutral-800/70 light:border-zinc-200">
