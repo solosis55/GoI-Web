@@ -32,7 +32,7 @@ const MIN_PASSWORD = 8;
 export function AuthPage() {
   const { setAuth } = useAuth();
   const rateLimitTimeoutRef = useRef<number | null>(null);
-  const [view, setView] = useState<AuthView>("register");
+  const [view, setView] = useState<AuthView>("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -194,18 +194,25 @@ export function AuthPage() {
           setPendingEmail(normalizedEmail);
           setPassword("");
           setView("verify-pending");
+          setLoading(false);
+          setResendLoading(true);
+          setError("");
+          setMessage("");
           try {
             const resend = await resendVerificationEmail(normalizedEmail);
-            setMessage(resend.message);
+            setMessage(
+              resend.message ||
+                "Te hemos enviado un correo para confirmar tu cuenta. Revisa bandeja y spam.",
+            );
             if (import.meta.env.DEV && resend.devVerificationToken) {
               const link = `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(resend.devVerificationToken)}`;
-              setDevResetHint(
-                `Modo desarrollo: enlace de verificación:\n${link}`,
-              );
+              setDevResetHint(`Modo desarrollo: enlace de verificación:\n${link}`);
             }
           } catch (resendErr) {
-            setMessage("Cuenta creada. Pulsa «Reenviar correo» si no recibes el enlace.");
+            setMessage("Cuenta creada. Pulsa «Reenviar correo» si no recibes el enlace en unos minutos.");
             setError(getErrorMessage(resendErr, "No se pudo enviar el correo de verificación"));
+          } finally {
+            setResendLoading(false);
           }
           return;
         }
@@ -434,10 +441,15 @@ export function AuthPage() {
 
         {view === "verify-pending" && (
           <div className="grid gap-3.5">
-            <p className="m-0 text-sm text-neutral-300 light:text-zinc-700">
-              Hemos enviado un enlace a{" "}
-              <strong className="font-semibold text-neutral-100 light:text-zinc-900">{pendingEmail}</strong>.
-            </p>
+            {resendLoading ? (
+              <p className="m-0 text-sm text-neutral-400 light:text-zinc-600">Enviando correo de verificación…</p>
+            ) : (
+              <p className="m-0 text-sm text-neutral-300 light:text-zinc-700">
+                Hemos enviado un enlace a{" "}
+                <strong className="font-semibold text-neutral-100 light:text-zinc-900">{pendingEmail}</strong>.
+                Ábrelo para activar tu cuenta (revisa también spam).
+              </p>
+            )}
             <StatusMessage tone="dark" error={error} success={message} />
             {devResetHint ? (
               <pre className="fs-muted-well max-h-40 overflow-auto whitespace-pre-wrap break-all p-3 text-xs leading-relaxed text-neutral-400 light:text-zinc-600">
@@ -587,7 +599,7 @@ export function AuthPage() {
                 setView((v) => (v === "register" ? "login" : "register"));
               }}
             >
-              {view === "register" ? "Ya tengo cuenta" : "No tengo cuenta aún"}
+              {view === "register" ? "Ya tengo cuenta — Iniciar sesión" : "¿No tienes cuenta? Crear cuenta"}
             </Button>
           </div>
         )}
