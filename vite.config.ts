@@ -32,6 +32,8 @@ export default defineConfig({
       "/api/personal-roadmap": { target: GOI_SERVER, changeOrigin: true },
       "/api/auth/forgot-password": { target: GOI_SERVER, changeOrigin: true },
       "/api/auth/reset-password": { target: GOI_SERVER, changeOrigin: true },
+      "/api/auth/verify-email": { target: GOI_SERVER, changeOrigin: true },
+      "/api/auth/resend-verification": { target: GOI_SERVER, changeOrigin: true },
       "/api/auth/personal-body": { target: GOI_SERVER, changeOrigin: true },
       "/uploads": { target: GOI_SERVER, changeOrigin: true },
       "/api/health": { target: GOI_SERVER, changeOrigin: true },

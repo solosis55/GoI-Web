@@ -11,6 +11,10 @@ function resolveDevApiBase(): string {
   return "/api";
 }
 
+function isRemoteApiUrl(url: string): boolean {
+  return url.startsWith("https://") || /^http:\/\/\d+\.\d+\.\d+\.\d+/.test(url);
+}
+
 /** Goi Server — API principal (:4000 en dev vía proxy Vite). */
 export const API_BASE_URL = import.meta.env.PROD
   ? envApiUrl && envApiUrl.length > 0
@@ -20,6 +24,11 @@ export const API_BASE_URL = import.meta.env.PROD
 
 if (import.meta.env.DEV) {
   console.log(`[Goi Web] API_BASE_URL → ${API_BASE_URL}`);
+  if (!isRemoteApiUrl(API_BASE_URL)) {
+    console.warn(
+      "[Goi Web] API local sin Resend: forgot/verify no envían correo. Usa VITE_API_URL=https://goi-server.onrender.com/api en .env.development",
+    );
+  }
 }
 
 const AUTH_EXPIRED_EVENT = "auth:expired";
