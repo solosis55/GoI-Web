@@ -187,4 +187,38 @@ export async function apiFetch<T>(path: string, options?: ApiFetchOptions): Prom
   return parsed as T;
 }
 
+/** Origen del servidor sin `/api` (p. ej. `https://goi-server.onrender.com`) para `/uploads/...`. */
+export function getApiOrigin(): string {
+  const base = API_BASE_URL.replace(/\/api\/?$/i, "");
+  if (base.startsWith("http://") || base.startsWith("https://")) return base;
+  if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
+  return "";
+}
+
+/** Convierte rutas `/uploads/...` del backend en URL absoluta usable en `<img>`. */
+export function resolveMediaUrl(url: string): string {
+  const u = url.trim();
+  if (!u) return u;
+  if (u.startsWith("data:")) return u;
+
+  const origin = getApiOrigin();
+
+  if (u.startsWith("http://") || u.startsWith("https://")) {
+    try {
+      const parsed = new URL(u);
+      const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      const host = parsed.hostname.toLowerCase();
+      if (host === "localhost" || host === "127.0.0.1") {
+        return origin ? `${origin}${path}` : u;
+      }
+      return u;
+    } catch {
+      return u;
+    }
+  }
+
+  if (u.startsWith("/")) return origin ? `${origin}${u}` : u;
+  return u;
+}
+
 export { AUTH_EXPIRED_EVENT };

@@ -148,6 +148,15 @@ export async function getPostById(postId: string): Promise<Post | null> {
   }
 }
 
+/** Solo imágenes — hidratación del feed cuando no vienen URLs en el listado. */
+export async function getPostMedia(postId: string): Promise<Post["media"]> {
+  const res = await apiFetch<{ media: Post["media"] }>(
+    `/posts/${encodeURIComponent(postId)}/media`,
+    { timeoutMs: POSTS_FETCH_TIMEOUT_MS },
+  );
+  return Array.isArray(res.media) ? res.media : [];
+}
+
 export function getPostsByUserPage(userId: string, opts: { limit: number; cursor?: string | null }) {
   const sp = new URLSearchParams();
   sp.set("limit", String(opts.limit));

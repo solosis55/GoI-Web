@@ -1,7 +1,9 @@
 import type { Post, PostComment } from "../types/post";
+import { resolvePostMedia } from "./postMedia";
 
 /** Asegura campos que la UI del feed exige (respuesta de Goi Server). */
 export function normalizePost(raw: Post): Post {
+  const media = Array.isArray(raw.media) ? resolvePostMedia(raw.media) : undefined;
   return {
     ...raw,
     authorUsername: raw.authorUsername?.trim() || "Usuario",
@@ -13,11 +15,11 @@ export function normalizePost(raw: Post): Post {
     likesCount: typeof raw.likesCount === "number" ? raw.likesCount : 0,
     likedByMe: raw.likedByMe ?? false,
     comments: Array.isArray(raw.comments) ? raw.comments.map(normalizeComment) : [],
-    media: Array.isArray(raw.media) ? raw.media : undefined,
+    media: media?.length ? media : undefined,
     hasMedia:
       raw.hasMedia === true ||
       (raw as { has_media?: boolean }).has_media === true ||
-      (raw.media?.length ?? 0) > 0,
+      (media?.length ?? 0) > 0,
   };
 }
 

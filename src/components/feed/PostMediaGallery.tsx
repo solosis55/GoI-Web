@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { PostMediaItem } from "../../types/post";
 import { PostMediaLightbox } from "./PostMediaLightbox";
+import { FeedPostImage } from "./FeedPostImage";
+import { resolvePostMedia } from "../../utils/postMedia";
 
 /** Tope para miniaturas / rejilla inline (no aplica al hero de una sola foto en feed). */
 export const POST_GALLERY_IMAGE_MAX_HEIGHT_PX = 520;
@@ -20,10 +22,11 @@ function isImage(m: PostMediaItem): m is PostMediaItem & { type: "image" } {
 }
 
 export function PostMediaGallery({ media, layout = "inline", feedInteractive = false }: PostMediaGalleryProps) {
-  const imageItems = useMemo(() => media.filter(isImage), [media]);
+  const resolvedMedia = useMemo(() => resolvePostMedia(media), [media]);
+  const imageItems = useMemo(() => resolvedMedia.filter(isImage), [resolvedMedia]);
   const urls = useMemo(() => imageItems.map((i) => i.url), [imageItems]);
   const hero = layout === "hero";
-  const single = media.length === 1;
+  const single = resolvedMedia.length === 1;
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -75,7 +78,7 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
     goToCarouselSlide(next);
   }, [carouselIdx, goToCarouselSlide, urls.length]);
 
-  if (!media.length) return null;
+  if (!resolvedMedia.length) return null;
 
   /** Hero del feed: carrusel + lightbox (no enlaces directos al asset). */
   if (feedInteractive && hero && urls.length > 0) {
@@ -99,11 +102,10 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
               onClick={() => openLightbox(0)}
               aria-label="Ampliar foto"
             >
-              <img
+              <FeedPostImage
                 src={urls[0]}
                 alt="Foto de la publicación"
                 loading="lazy"
-                decoding="async"
                 className="block h-auto w-full max-w-full bg-neutral-950 transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100"
                 style={heroImgStyle}
               />
@@ -122,14 +124,12 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
                       onClick={() => openLightbox(index)}
                       aria-label={`Foto ${index + 1} de ${urls.length}, ampliar`}
                     >
-                      <img
+                      <FeedPostImage
                         src={url}
                         alt={`Foto ${index + 1} de ${urls.length}`}
                         loading={index === 0 ? "eager" : "lazy"}
-                        decoding="async"
                         className="block h-auto w-full max-w-full bg-neutral-950 transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100"
                         style={heroImgStyle}
-                        draggable={false}
                       />
                     </button>
                   </div>
@@ -192,9 +192,9 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
 
   const heroSingle = hero && single;
   const grid =
-    media.length === 1
+    resolvedMedia.length === 1
       ? "grid-cols-1"
-      : media.length === 2
+      : resolvedMedia.length === 2
         ? "grid-cols-2"
         : "grid-cols-2 sm:grid-cols-3";
 
@@ -225,7 +225,7 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
 
   return (
     <div className={shellClass}>
-      {media.map((item, index) =>
+      {resolvedMedia.map((item, index) =>
         item.type === "image" ? (
           <a
             key={`${index}-${item.url.slice(0, 32)}`}
@@ -241,32 +241,27 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
             }
           >
             {heroSingle ? (
-              <img
+              <FeedPostImage
                 src={item.url}
                 alt={`Foto ${index + 1} de la publicación`}
-                loading="lazy"
-                decoding="async"
                 className="block h-auto w-full max-w-full bg-neutral-950 transition duration-200 group-hover:brightness-[1.04] light:bg-zinc-100"
                 style={{
-                  /** Ratio natural a ancho del post; solo limita retratos enormes (sin recorte tipo cover). */
                   maxHeight: "min(92vh, 1400px)",
                   width: "100%",
                   height: "auto",
                 }}
               />
             ) : (
-              <img
+              <FeedPostImage
                 src={item.url}
                 alt={`Foto ${index + 1} de la publicación`}
-                loading="lazy"
-                decoding="async"
+                className={imgContainClass}
                 style={{
                   maxHeight: POST_GALLERY_IMAGE_MAX_HEIGHT_PX,
                   width: "100%",
                   height: "auto",
                   objectFit: "contain",
                 }}
-                className={imgContainClass}
               />
             )}
           </a>

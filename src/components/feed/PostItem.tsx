@@ -9,6 +9,7 @@ import type { MentionPickUser } from "../../utils/mentionAutocomplete";
 import type { MentionUserDirectory } from "../../utils/mentionText";
 import { visibilityBadgeClasses } from "../../utils/visibilityBadgeClasses";
 import { formatPostAbsolute, formatPostRelative } from "../../utils/feedPostDate";
+import { hasDisplayableMedia } from "../../utils/postMedia";
 import { PostFeedText } from "./PostFeedText";
 import { FeedPostOverflowMenu } from "./FeedPostOverflowMenu";
 import { usePostMediaHydration } from "../../hooks/usePostMediaHydration";
@@ -129,7 +130,7 @@ export function PostItem({
     if (commentsOpen) setComposerExpanded(true);
   }, [commentsOpen]);
 
-  const hasMedia = (displayPost.media?.length ?? 0) > 0;
+  const hasMedia = hasDisplayableMedia(displayPost);
   const showComposerMobile =
     composerExpanded || commentValue.trim().length > 0;
 
