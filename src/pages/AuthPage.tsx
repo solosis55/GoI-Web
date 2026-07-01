@@ -188,12 +188,25 @@ export function AuthPage() {
       }
 
       if (view === "register") {
-        const reg = await register({ username: username.trim(), email, password });
+        const normalizedEmail = email.trim().toLowerCase();
+        const reg = await register({ username: username.trim(), email: normalizedEmail, password });
         if (reg.requiresEmailVerification || !reg.token) {
-          setPendingEmail(email.trim());
+          setPendingEmail(normalizedEmail);
           setPassword("");
           setView("verify-pending");
-          setMessage("Te hemos enviado un correo para confirmar tu cuenta. Revisa bandeja y spam.");
+          try {
+            const resend = await resendVerificationEmail(normalizedEmail);
+            setMessage(resend.message);
+            if (import.meta.env.DEV && resend.devVerificationToken) {
+              const link = `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(resend.devVerificationToken)}`;
+              setDevResetHint(
+                `Modo desarrollo: enlace de verificación:\n${link}`,
+              );
+            }
+          } catch (resendErr) {
+            setMessage("Cuenta creada. Pulsa «Reenviar correo» si no recibes el enlace.");
+            setError(getErrorMessage(resendErr, "No se pudo enviar el correo de verificación"));
+          }
           return;
         }
         if (reg.token && reg.user) {
