@@ -22,6 +22,9 @@ import {
   type ComposerTransferState,
   type PendingPostImage,
 } from "../components/feed/CreatePostForm";
+import { CreatePostTrainingForm } from "../components/feed/CreatePostTrainingForm";
+import { CreatePostFormatChooser } from "../components/feed/CreatePostFormatChooser";
+import { CreatePostFormatSegment } from "../components/feed/CreatePostFormatSegment";
 import { FeedNotificationsBell } from "../components/feed/FeedNotificationsBell";
 import { FeedModeTabs, type FeedScope } from "../components/feed/FeedModeTabs";
 import { FeedReportModal } from "../components/feed/FeedReportModal";
@@ -50,8 +53,15 @@ import { readViewportScrollY, writeViewportScrollY } from "../utils/viewportScro
 import type { MentionPickUser } from "../utils/mentionAutocomplete";
 import { buildMentionDirectory } from "../utils/mentionText";
 import { applyPostTemplate } from "../utils/postComposerTemplates";
+import { resolveDefaultPostVisibility } from "../constants/createPost";
+import type { PostFormat } from "../constants/postFormat";
+import { validateCreatePost } from "../utils/createPostValidation";
 import { compressManyImageFiles, POST_IMAGE_MAX_FILES } from "../utils/postImages";
-import { clearPostCreateDraft, readPostCreateDraft, writePostCreateDraft } from "../utils/postCreateDraft";
+import {
+  clearPostCreateDraft,
+  readPostCreateDraft,
+  writePostCreateDraft,
+} from "../utils/postCreateDraft";
 import { useMentionRecents } from "../hooks/useMentionRecents";
 import { useNearViewport } from "../hooks/useNearViewport";
 import {
@@ -139,6 +149,8 @@ type FeedPageProps = {
   onNavigateToExternalProfile?: (userId: string, followingIds: string[]) => void;
   /** Sidebar «Ir al perfil»: va al perfil propio (el modal público no se usa para la cuenta actual). */
   onGoToOwnProfile?: () => void;
+  /** Posts Training propios: ir al historial de entrenamientos (sesiones hechas en móvil). */
+  onGoToWorkouts?: () => void;
 };
 
 function FeedHomeAccentIcon({ className }: { className?: string }) {
@@ -184,6 +196,7 @@ export function FeedPage({
   onFocusPostHandled,
   onNavigateToExternalProfile,
   onGoToOwnProfile,
+  onGoToWorkouts,
 }: FeedPageProps = {}) {
   const { user, logout } = useAuth();
 
@@ -200,6 +213,7 @@ export function FeedPage({
   const [posts, setPosts] = useState<Post[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [content, setContent] = useState("");
+  const [composerFormat, setComposerFormat] = useState<PostFormat | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [postVisibility, setPostVisibility] = useState<"public" | "followers" | "private">("public");
   const [draftImages, setDraftImages] = useState<PendingPostImage[]>([]);
@@ -262,6 +276,8 @@ export function FeedPage({
     try {
       if (sessionStorage.getItem(OPEN_FEED_COMPOSER_SESSION_KEY) === "1") {
         sessionStorage.removeItem(OPEN_FEED_COMPOSER_SESSION_KEY);
+        setComposerFormat(null);
+        setComposerHydrated(false);
         setMobileComposerOpen(true);
       }
     } catch {
@@ -436,36 +452,97 @@ export function FeedPage({
   postsForFocusRef.current = posts;
   postsFilteredForFocusRef.current = postsFiltered;
 
-  const composerValidation = useMemo(() => {
-    const trimmed = content.trim();
-    const hasMedia = draftImages.length > 0;
-    if (!hasMedia && trimmed.length < 4) {
-      return {
-        canSubmit: false,
-        hint: `Escribe al menos ${Math.max(0, 4 - trimmed.length)} caracteres o adjunta una foto.`,
-      };
-    }
-    if (trimmed.length > 280) {
-      return { canSubmit: false, hint: `Te pasaste por ${trimmed.length - 280} caracteres.` };
-    }
-    return { canSubmit: true, hint: "" };
-  }, [content, draftImages.length]);
-
-  const composerHasPendingChanges = useMemo(
-    () =>
-      content.trim().length > 0 ||
-      draftImages.length > 0 ||
-      selectedSessionId.length > 0 ||
-      postVisibility !== "public",
-    [content, draftImages.length, selectedSessionId, postVisibility],
+  const defaultPostVisibility = useMemo(
+    () => resolveDefaultPostVisibility(user?.defaultPostVisibility),
+    [user?.defaultPostVisibility],
   );
 
+  const myWorkoutSessions = useMemo(
+    () => (user ? workoutSessions.filter((s) => s.userId === user.id) : []),
+    [workoutSessions, user],
+  );
+
+  const selectedSessionWorkoutTitle = useMemo(() => {
+    const match = myWorkoutSessions.find((s) => s.id === selectedSessionId);
+    return match?.workoutTitle ?? "";
+  }, [myWorkoutSessions, selectedSessionId]);
+
+  const composerValidation = useMemo(
+    () => validateCreatePost(content, draftImages.length, composerFormat ?? "standard"),
+    [content, draftImages.length, composerFormat],
+  );
+
+  const composerHasPendingChanges = useMemo(() => {
+    if (!composerFormat) return false;
+    return (
+      content.trim().length > 0 ||
+      draftImages.length > 0 ||
+      postVisibility !== defaultPostVisibility ||
+      selectedSessionId.length > 0
+    );
+  }, [
+    composerFormat,
+    content,
+    draftImages.length,
+    postVisibility,
+    defaultPostVisibility,
+    selectedSessionId,
+  ]);
+
   const resetComposer = useCallback(() => {
+    if (user?.id && composerFormat) {
+      clearPostCreateDraft(user.id, composerFormat);
+    }
     setContent("");
     setSelectedSessionId("");
-    setPostVisibility("public");
+    setPostVisibility(defaultPostVisibility);
     setDraftImages([]);
-    clearPostCreateDraft();
+    setComposerFormat(null);
+    setComposerHydrated(false);
+  }, [defaultPostVisibility, composerFormat, user?.id]);
+
+  const openComposer = useCallback(() => {
+    setComposerFormat(null);
+    setComposerHydrated(false);
+    setMobileComposerOpen(true);
+  }, []);
+
+  const requestFormatChange = useCallback(
+    (next: PostFormat) => {
+      if (!user?.id || next === composerFormat) return;
+      if (composerHasPendingChanges) {
+        const ok = window.confirm(
+          "Tienes un borrador en curso. Al cambiar de formato se cargará el borrador de ese tipo si existe.",
+        );
+        if (!ok) return;
+        if (composerFormat) {
+          writePostCreateDraft({
+            userId: user.id,
+            format: composerFormat,
+            content,
+            visibility: postVisibility,
+            sessionId: selectedSessionId,
+            sessionWorkoutTitle: selectedSessionWorkoutTitle,
+          });
+        }
+      }
+      setComposerHydrated(false);
+      setComposerFormat(next);
+    },
+    [
+      user?.id,
+      composerFormat,
+      composerHasPendingChanges,
+      content,
+      postVisibility,
+      selectedSessionId,
+      selectedSessionWorkoutTitle,
+    ],
+  );
+
+  const handleSelectComposerFormat = useCallback((format: PostFormat) => {
+    setComposerHydrated(false);
+    setComposerFormat(format);
   }, []);
 
   const requestCloseComposer = useCallback(() => {
@@ -475,8 +552,28 @@ export function FeedPage({
       );
       if (!ok) return;
     }
+    if (user?.id && composerFormat) {
+      writePostCreateDraft({
+        userId: user.id,
+        format: composerFormat,
+        content,
+        visibility: postVisibility,
+        sessionId: selectedSessionId,
+        sessionWorkoutTitle: selectedSessionWorkoutTitle,
+      });
+    }
     setMobileComposerOpen(false);
-  }, [composerHasPendingChanges]);
+    setComposerFormat(null);
+    setComposerHydrated(false);
+  }, [
+    composerHasPendingChanges,
+    user?.id,
+    composerFormat,
+    content,
+    postVisibility,
+    selectedSessionId,
+    selectedSessionWorkoutTitle,
+  ]);
 
   useEffect(() => {
     if (!mobileComposerOpen) return;
@@ -488,26 +585,42 @@ export function FeedPage({
   }, [mobileComposerOpen]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    const draft = readPostCreateDraft(user.id);
+    if (!composerFormat || !user?.id || composerHydrated) return;
+    const draft = readPostCreateDraft(user.id, composerFormat);
     if (draft) {
       setContent(draft.content);
-      setSelectedSessionId(draft.selectedSessionId);
       setPostVisibility(draft.visibility);
+      setSelectedSessionId(draft.sessionId);
+      setDraftImages([]);
       setMessage("Borrador recuperado.");
+    } else {
+      setContent("");
+      setPostVisibility(defaultPostVisibility);
+      setSelectedSessionId("");
+      setDraftImages([]);
     }
     setComposerHydrated(true);
-  }, [user?.id]);
+  }, [composerFormat, user?.id, composerHydrated, defaultPostVisibility]);
 
   useEffect(() => {
-    if (!composerHydrated || !user?.id) return;
+    if (!composerHydrated || !user?.id || !composerFormat) return;
     writePostCreateDraft({
       userId: user.id,
+      format: composerFormat,
       content,
       visibility: postVisibility,
-      selectedSessionId,
+      sessionId: selectedSessionId,
+      sessionWorkoutTitle: selectedSessionWorkoutTitle,
     });
-  }, [composerHydrated, user?.id, content, postVisibility, selectedSessionId]);
+  }, [
+    composerHydrated,
+    user?.id,
+    composerFormat,
+    content,
+    postVisibility,
+    selectedSessionId,
+    selectedSessionWorkoutTitle,
+  ]);
 
   useEffect(() => {
     try {
@@ -828,20 +941,19 @@ export function FeedPage({
 
   async function handleCreatePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || createBusy) return;
+    if (!user || createBusy || !composerFormat) return;
     setError("");
     setMessage("");
 
+    const validation = validateCreatePost(content, draftImages.length, composerFormat);
+    if (!validation.canSubmit) {
+      setError(validation.hint || "Revisa el contenido antes de publicar.");
+      return;
+    }
+
     const trimmed = content.trim();
-    const hasMedia = draftImages.length > 0;
-    if (!hasMedia && trimmed.length < 4) {
-      setError("Sin fotos hace falta al menos 4 caracteres.");
-      return;
-    }
-    if (trimmed.length > 280) {
-      setError("El texto no puede superar 280 caracteres.");
-      return;
-    }
+    const sessionId = selectedSessionId.trim() || null;
+    const publishingFormat = composerFormat;
 
     setCreateBusy(true);
     let uploadProgressTimer: number | null = null;
@@ -849,7 +961,12 @@ export function FeedPage({
       setComposerTransferState({
         phase: "uploading",
         progress: draftImages.length > 0 ? 18 : 30,
-        message: draftImages.length > 0 ? "Subiendo publicación e imágenes…" : "Publicando…",
+        message:
+          draftImages.length > 0
+            ? "Subiendo publicación e imágenes…"
+            : composerFormat === "training"
+              ? "Publicando training…"
+              : "Publicando…",
       });
       uploadProgressTimer = window.setInterval(() => {
         setComposerTransferState((current) => {
@@ -860,29 +977,30 @@ export function FeedPage({
           };
         });
       }, 180);
-      const sessionId = selectedSessionId.trim() || null;
       const createdPost = await createPost({
         content: trimmed,
-        format: sessionId ? "training" : "standard",
+        format: publishingFormat,
         sessionId,
         visibility: postVisibility,
-        ...(hasMedia ? { uploadFiles: draftImages.map((img) => img.uploadFile) } : {}),
+        ...(draftImages.length > 0 ? { uploadFiles: draftImages.map((img) => img.uploadFile) } : {}),
       });
       if (uploadProgressTimer) window.clearInterval(uploadProgressTimer);
       setComposerTransferState({
         phase: "uploading",
         progress: 100,
-        message: "Publicación subida correctamente.",
+        message: publishingFormat === "training" ? "Training publicado." : "Publicación subida correctamente.",
       });
+      clearPostCreateDraft(user.id, publishingFormat);
       setContent("");
       setSelectedSessionId("");
-      setPostVisibility("public");
+      setPostVisibility(defaultPostVisibility);
       setDraftImages([]);
-      clearPostCreateDraft();
+      setComposerFormat(null);
+      setComposerHydrated(false);
       setMobileComposerOpen(false);
       setComposerTransferState(null);
       setPosts((prev) => [createdPost, ...prev]);
-      setMessage("Publicación creada.");
+      setMessage(publishingFormat === "training" ? "Training publicado." : "Publicación creada.");
     } catch (createError) {
       if (uploadProgressTimer) window.clearInterval(uploadProgressTimer);
       setComposerTransferState({
@@ -1070,7 +1188,7 @@ export function FeedPage({
               <button
                 type="button"
                 className="group relative hidden min-h-11 min-w-11 items-center justify-center rounded-xl border border-goi-gold/45 bg-goi-gold/12 px-3 text-sm font-semibold text-goi-gold shadow-sm shadow-goi-gold/10 transition hover:bg-goi-gold/22 hover:shadow-md hover:shadow-goi-gold/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/45 sm:inline-flex"
-                onClick={() => setMobileComposerOpen(true)}
+                onClick={openComposer}
                 aria-label="Crear publicación"
                 title="Crear publicación"
               >
@@ -1324,6 +1442,14 @@ export function FeedPage({
                         })
                     : undefined
                 }
+                onOpenSession={
+                  userId && entry.post.userId === userId && onGoToWorkouts
+                    ? () => {
+                        onGoToWorkouts();
+                        setMessage("Historial de entrenamientos en la pestaña Rutinas.");
+                      }
+                    : undefined
+                }
               />
             ),
           )}
@@ -1421,7 +1547,7 @@ export function FeedPage({
         type="button"
         className="fixed bottom-4 right-4 z-30 inline-flex min-h-12 min-w-12 items-center justify-center rounded-full border border-goi-gold/55 bg-goi-gold text-xl font-bold text-black shadow-[0_10px_26px_-10px_rgba(212,175,55,0.9)] sm:hidden"
         aria-label="Nueva publicación"
-        onClick={() => setMobileComposerOpen(true)}
+        onClick={openComposer}
       >
         +
       </button>
@@ -1444,6 +1570,7 @@ export function FeedPage({
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <h3 className="text-base font-semibold text-neutral-100 light:text-zinc-900">Nueva publicación</h3>
                     <div className="flex items-center gap-2">
+                      {composerFormat ? (
                       <button
                         type="button"
                         className="inline-flex min-h-11 items-center rounded-lg border border-red-700/80 bg-red-950/40 px-3 text-sm font-medium text-red-300 hover:bg-red-950/60 light:border-red-600/80 light:bg-red-50 light:text-red-800"
@@ -1460,6 +1587,7 @@ export function FeedPage({
                       >
                         Descartar borrador
                       </button>
+                      ) : null}
                       <button
                         type="button"
                         className="inline-flex min-h-11 items-center rounded-lg border border-neutral-700 px-3 text-sm text-neutral-300 light:border-zinc-300 light:text-zinc-700"
@@ -1469,41 +1597,83 @@ export function FeedPage({
                       </button>
                     </div>
                   </div>
+                  {composerFormat ? (
+                    <div className="mb-3">
+                      <CreatePostFormatSegment value={composerFormat} onChange={requestFormatChange} />
+                    </div>
+                  ) : null}
                   <div
                     className={[
                       "grid gap-3 transition-all duration-200 ease-out",
-                      cropTarget ? "lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]" : "grid-cols-1",
+                      cropTarget && composerFormat ? "lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]" : "grid-cols-1",
                     ].join(" ")}
                   >
                     <div className="min-w-0">
-                      <CreatePostForm
-                        content={content}
-                        selectedSessionId={selectedSessionId}
-                        visibility={postVisibility}
-                        sessions={workoutSessions.filter((s) => s.userId === user?.id)}
-                        pendingImages={draftImages}
-                        onChangeContent={setContent}
-                        onChangeSessionId={setSelectedSessionId}
-                        onChangeVisibility={setPostVisibility}
-                        onAddImages={(files) => void handleDraftAddPhotos(files)}
-                        onRemoveImage={(id) => setDraftImages((list) => list.filter((img) => img.id !== id))}
-                        onMoveImage={reorderDraftImage}
-                        onSetCoverImage={setDraftCoverImage}
-                        onCropImage={openCropEditor}
-                        submitDisabled={photoBusy || createBusy}
-                        submitHint={composerValidation.hint}
-                        canSubmit={composerValidation.canSubmit}
-                        onSubmit={handleCreatePost}
-                        transferState={composerTransferState}
-                        mediaBusy={photoBusy || createBusy}
-                        onMentionPick={handleMentionPicked}
-                        onApplyTemplate={handleApplyComposerTemplate}
-                        mentionCandidates={mentionPickList}
-                        previewAuthor={
-                          user ? { username: user.username, avatarUrl: user.avatarUrl ?? "" } : undefined
-                        }
-                        mentionDirectory={mentionDirectory}
-                      />
+                      {!composerFormat ? (
+                        <CreatePostFormatChooser
+                          username={user?.username ?? "tu"}
+                          avatarUrl={user?.avatarUrl ?? ""}
+                          onSelect={handleSelectComposerFormat}
+                        />
+                      ) : composerFormat === "standard" ? (
+                        <CreatePostForm
+                          content={content}
+                          visibility={postVisibility}
+                          pendingImages={draftImages}
+                          onChangeContent={setContent}
+                          onChangeVisibility={setPostVisibility}
+                          onAddImages={(files) => void handleDraftAddPhotos(files)}
+                          onRemoveImage={(id) => setDraftImages((list) => list.filter((img) => img.id !== id))}
+                          onMoveImage={reorderDraftImage}
+                          onSetCoverImage={setDraftCoverImage}
+                          onCropImage={openCropEditor}
+                          submitDisabled={photoBusy || createBusy}
+                          submitHint={composerValidation.hint}
+                          canSubmit={composerValidation.canSubmit}
+                          onSubmit={handleCreatePost}
+                          transferState={composerTransferState}
+                          mediaBusy={photoBusy || createBusy}
+                          onMentionPick={handleMentionPicked}
+                          onApplyTemplate={handleApplyComposerTemplate}
+                          mentionCandidates={mentionPickList}
+                          previewAuthor={
+                            user ? { username: user.username, avatarUrl: user.avatarUrl ?? "" } : undefined
+                          }
+                          mentionDirectory={mentionDirectory}
+                          selectedSessionId={selectedSessionId}
+                          sessions={myWorkoutSessions}
+                          onChangeSessionId={setSelectedSessionId}
+                        />
+                      ) : (
+                        <CreatePostTrainingForm
+                          content={content}
+                          visibility={postVisibility}
+                          pendingImages={draftImages}
+                          selectedSessionId={selectedSessionId}
+                          sessions={myWorkoutSessions}
+                          onChangeContent={setContent}
+                          onChangeVisibility={setPostVisibility}
+                          onChangeSessionId={setSelectedSessionId}
+                          onAddImages={(files) => void handleDraftAddPhotos(files)}
+                          onRemoveImage={(id) => setDraftImages((list) => list.filter((img) => img.id !== id))}
+                          onMoveImage={reorderDraftImage}
+                          onSetCoverImage={setDraftCoverImage}
+                          onCropImage={openCropEditor}
+                          submitDisabled={photoBusy || createBusy}
+                          submitHint={composerValidation.hint}
+                          canSubmit={composerValidation.canSubmit}
+                          onSubmit={handleCreatePost}
+                          transferState={composerTransferState}
+                          mediaBusy={photoBusy || createBusy}
+                          onMentionPick={handleMentionPicked}
+                          onApplyTemplate={handleApplyComposerTemplate}
+                          mentionCandidates={mentionPickList}
+                          previewAuthor={
+                            user ? { username: user.username, avatarUrl: user.avatarUrl ?? "" } : undefined
+                          }
+                          mentionDirectory={mentionDirectory}
+                        />
+                      )}
                     </div>
                     {cropTarget ? (
                       <SquareImageCropEditor

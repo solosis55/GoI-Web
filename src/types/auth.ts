@@ -12,6 +12,7 @@ export type SafeUser = {
   stravaUrl: string;
   location: string;
   profileVisibility: "public" | "followers";
+  defaultPostVisibility: "public" | "followers" | "private";
   pinnedPostId: string;
   createdAt: string;
   updatedAt: string;

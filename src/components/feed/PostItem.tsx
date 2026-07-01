@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PostActions } from "./PostActions";
 import { CommentList } from "./CommentList";
 import { MentionComposer } from "./MentionComposer";
@@ -12,7 +12,10 @@ import { formatPostAbsolute, formatPostRelative } from "../../utils/feedPostDate
 import { hasDisplayableMedia } from "../../utils/postMedia";
 import { PostFeedText } from "./PostFeedText";
 import { FeedPostOverflowMenu } from "./FeedPostOverflowMenu";
+import { PostTrainingBody } from "./PostTrainingBody";
+import { PublicationLinkedSessionBody } from "./PublicationLinkedSessionBody";
 import { usePostMediaHydration } from "../../hooks/usePostMediaHydration";
+import { trainingFeedInsetWidth } from "../../utils/trainingFeedMediaLayout";
 
 type PostItemProps = {
   post: Post;
@@ -39,6 +42,8 @@ type PostItemProps = {
   onToggleSave?: () => void;
   onMuteAuthor?: () => void;
   onReport?: () => void;
+  /** Detalle de sesión (posts Training propios → historial en Web). */
+  onOpenSession?: (sessionId: string) => void;
 };
 
 function DumbbellIcon({ className }: { className?: string }) {
@@ -77,6 +82,7 @@ export function PostItem({
   onToggleSave,
   onMuteAuthor,
   onReport,
+  onOpenSession,
 }: PostItemProps) {
   const displayPost = usePostMediaHydration(post);
   const [editing, setEditing] = useState(false);
@@ -85,12 +91,38 @@ export function PostItem({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [composerExpanded, setComposerExpanded] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [sessionInlineOpen, setSessionInlineOpen] = useState(false);
 
   const visibility = post.visibility ?? "public";
   const visibilityLabel =
     visibility === "public" ? "Público" : visibility === "followers" ? "Seguidores" : "Solo yo";
+  const postFormat = post.format ?? "standard";
+  const isTrainingPost = postFormat === "training";
+  const showVisibilityBadge = visibility !== "public";
+  const feedCardWidth =
+    typeof window !== "undefined"
+      ? Math.min(Math.max(window.innerWidth - 64, 280), 672)
+      : trainingFeedInsetWidth(360) / 0.82;
 
   const commentsCount = post.comments.length;
+
+  const canPreviewLinkedSession = useMemo(
+    () =>
+      !isTrainingPost &&
+      Boolean(displayPost.sessionId) &&
+      Boolean(
+        displayPost.sessionWorkoutTitle ||
+          (displayPost.sessionExercisePreviews?.length ?? 0) > 0 ||
+          displayPost.sessionTotalSets,
+      ),
+    [
+      isTrainingPost,
+      displayPost.sessionId,
+      displayPost.sessionWorkoutTitle,
+      displayPost.sessionExercisePreviews,
+      displayPost.sessionTotalSets,
+    ],
+  );
 
   function startEdit() {
     setEditContent(post.content);
@@ -115,6 +147,10 @@ export function PostItem({
   }
 
   useEffect(() => {
+    setSessionInlineOpen(false);
+  }, [post.id]);
+
+  useEffect(() => {
     if (editing) return;
     setEditContent(post.content);
     setEditVisibility(visibility);
@@ -131,6 +167,7 @@ export function PostItem({
   }, [commentsOpen]);
 
   const hasMedia = hasDisplayableMedia(displayPost);
+  const showStandardMedia = !isTrainingPost && hasMedia && !editing;
   const showComposerMobile =
     composerExpanded || commentValue.trim().length > 0;
 
@@ -208,6 +245,10 @@ export function PostItem({
               >
                 {formatPostRelative(post.createdAt)}
               </time>
+              {isTrainingPost ? (
+                <span className="text-[11px] font-bold uppercase tracking-wide text-goi-gold-dim">Training</span>
+              ) : null}
+              {showVisibilityBadge ? (
               <span
                 className={[
                   "inline-flex scale-[0.96] items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-90",
@@ -223,13 +264,31 @@ export function PostItem({
               >
                 {visibilityLabel}
               </span>
+              ) : null}
               </div>
             </div>
           </div>
         </div>
 
         <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:self-start sm:pt-1">
-          <PostActions likedByMe={post.likedByMe} likesCount={post.likesCount} onLike={onLike} />
+          {!showStandardMedia || isTrainingPost ? (
+            <PostActions
+              likedByMe={post.likedByMe}
+              likesCount={post.likesCount}
+              onLike={onLike}
+              onPressSessionPreview={
+                canPreviewLinkedSession
+                  ? () => {
+                      setSessionInlineOpen((open) => {
+                        if (!open) setCommentsOpen(false);
+                        return !open;
+                      });
+                    }
+                  : undefined
+              }
+              sessionPreviewActive={sessionInlineOpen}
+            />
+          ) : null}
           {currentUserId && onToggleSave ? (
             <FeedPostOverflowMenu
               disabled={false}
@@ -248,13 +307,33 @@ export function PostItem({
         </div>
       </div>
 
-      {!editing && hasMedia ? (
-        <PostMediaGallery layout="hero" media={displayPost.media ?? []} feedInteractive />
+      {!editing && showStandardMedia ? (
+        <>
+          <PostMediaGallery layout="hero" media={displayPost.media ?? []} feedInteractive />
+          <div className="flex items-center gap-2 px-4 py-2 sm:px-5">
+            <PostActions
+              likedByMe={post.likedByMe}
+              likesCount={post.likesCount}
+              onLike={onLike}
+              onPressSessionPreview={
+                canPreviewLinkedSession
+                  ? () => {
+                      setSessionInlineOpen((open) => {
+                        if (!open) setCommentsOpen(false);
+                        return !open;
+                      });
+                    }
+                  : undefined
+              }
+              sessionPreviewActive={sessionInlineOpen}
+            />
+          </div>
+        </>
       ) : null}
 
       <div
         className={`space-y-3 px-4 pb-4 sm:px-5 sm:pb-5 ${
-          hasMedia && !editing ? "pt-4 sm:pt-5" : "pt-1 sm:pt-2"
+          showStandardMedia ? "pt-4 sm:pt-5" : "pt-1 sm:pt-2"
         }`}
       >
         {editing ? (
@@ -300,15 +379,59 @@ export function PostItem({
           </div>
         ) : (
           <>
-            <PostFeedText
-              content={post.content}
-              mentionDirectory={mentionDirectory}
-              onOpenProfile={onOpenUserProfile}
-            />
+            {!isTrainingPost && sessionInlineOpen && canPreviewLinkedSession ? (
+              <PublicationLinkedSessionBody
+                workoutTitle={displayPost.sessionWorkoutTitle ?? getWorkoutTitle(post.workoutId)}
+                performedAt={displayPost.sessionPerformedAt}
+                metrics={{
+                  completedSets: displayPost.sessionCompletedSets,
+                  totalSets: displayPost.sessionTotalSets,
+                  completedExercises: displayPost.sessionCompletedExercises,
+                  totalExercises: displayPost.sessionTotalExercises,
+                }}
+                exercisePreviews={displayPost.sessionExercisePreviews ?? []}
+                moreExercisesCount={displayPost.sessionMoreExercisesCount ?? 0}
+                onPressViewSession={
+                  displayPost.sessionId && onOpenSession
+                    ? () => onOpenSession(displayPost.sessionId!)
+                    : undefined
+                }
+              />
+            ) : displayPost.content.trim() ? (
+              <PostFeedText
+                content={post.content}
+                mentionDirectory={mentionDirectory}
+                onOpenProfile={onOpenUserProfile}
+              />
+            ) : null}
+
+            {isTrainingPost ? (
+              <PostTrainingBody
+                sessionId={displayPost.sessionId}
+                workoutTitle={displayPost.sessionWorkoutTitle ?? getWorkoutTitle(post.workoutId)}
+                performedAt={displayPost.sessionPerformedAt}
+                metrics={{
+                  completedSets: displayPost.sessionCompletedSets,
+                  totalSets: displayPost.sessionTotalSets,
+                  completedExercises: displayPost.sessionCompletedExercises,
+                  totalExercises: displayPost.sessionTotalExercises,
+                }}
+                exercisePreviews={displayPost.sessionExercisePreviews ?? []}
+                moreExercisesCount={displayPost.sessionMoreExercisesCount ?? 0}
+                media={hasMedia ? displayPost.media : undefined}
+                cardWidth={feedCardWidth}
+                onPressSession={
+                  displayPost.sessionId && onOpenSession
+                    ? () => onOpenSession(displayPost.sessionId!)
+                    : undefined
+                }
+                showViewFullCta={Boolean(displayPost.sessionId && onOpenSession)}
+              />
+            ) : null}
           </>
         )}
 
-        {post.workoutId ? (
+        {!isTrainingPost && post.workoutId ? (
           <div className="flex w-full max-w-full flex-col items-start gap-1.5 rounded-2xl border border-goi-gold/30 bg-goi-gold/[0.09] px-3 py-2 text-xs shadow-[inset_0_1px_0_0_rgba(212,175,55,0.12)] sm:inline-flex sm:w-auto sm:max-w-full sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:rounded-full sm:py-1.5 light:border-goi-gold/35 light:bg-goi-gold/[0.1] healthy:bg-goi-gold/[0.08]">
             <span className="inline-flex shrink-0 items-center gap-2">
               <DumbbellIcon className="size-4 shrink-0 text-goi-gold" />

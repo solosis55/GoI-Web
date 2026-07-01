@@ -11,6 +11,10 @@ export function mergeSafeUser(user: SafeUser): SafeUser {
     stravaUrl: user.stravaUrl ?? "",
     location: user.location ?? "",
     profileVisibility: user.profileVisibility === "followers" ? "followers" : "public",
+    defaultPostVisibility:
+      user.defaultPostVisibility === "followers" || user.defaultPostVisibility === "private"
+        ? user.defaultPostVisibility
+        : "public",
     pinnedPostId: user.pinnedPostId ?? "",
   };
 }

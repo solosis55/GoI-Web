@@ -1,3 +1,5 @@
+import type { WorkoutSessionSnapshot } from "./workoutSessionSnapshot";
+
 export type WorkoutSession = {
   id: string;
   userId: string;
@@ -9,6 +11,7 @@ export type WorkoutSession = {
 
 export type WorkoutSessionWithTitle = WorkoutSession & {
   workoutTitle: string;
+  snapshot?: WorkoutSessionSnapshot;
 };
 
 export type CreateWorkoutSessionInput = {

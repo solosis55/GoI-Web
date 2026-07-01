@@ -9,30 +9,28 @@ import {
   POST_IMAGE_MAX_FILES,
   POST_VISIBILITY_OPTIONS,
 } from "../../constants/createPost";
+import { CAPTION_PROMPTS_TRAINING, sessionPostTemplate } from "../../constants/createPostPrompts";
 import { MentionHighlighted, type MentionUserDirectory } from "../../utils/mentionText";
-import { PostFeedPreviewStandard } from "./PostFeedPreviewStandard";
+import { PostFeedPreviewTraining } from "./PostFeedPreviewTraining";
 import { CreatePostSessionField } from "./CreatePostSessionField";
 import type { WorkoutSessionWithTitle } from "../../types/workoutSession";
 import {
   buildSessionExercisePreviews,
   countRemainingExercises,
 } from "../../utils/sessionExercisePreview";
+import type { ComposerTransferState, PendingPostImage } from "./CreatePostForm";
 
 type Visibility = NonNullable<CreatePostInput["visibility"]>;
 
-export type PendingPostImage = { id: string; dataUrl: string; name: string; uploadFile: File };
-export type ComposerTransferState = {
-  phase: "processing" | "uploading" | "error";
-  progress: number;
-  message: string;
-};
-
-type CreatePostFormProps = {
+type CreatePostTrainingFormProps = {
   content: string;
   visibility: Visibility;
   pendingImages: PendingPostImage[];
+  selectedSessionId: string;
+  sessions: WorkoutSessionWithTitle[];
   onChangeContent: (value: string) => void;
   onChangeVisibility: (value: Visibility) => void;
+  onChangeSessionId: (sessionId: string) => void;
   onAddImages: (files: FileList | null) => void;
   onRemoveImage: (id: string) => void;
   onMoveImage: (id: string, direction: "left" | "right") => void;
@@ -49,34 +47,21 @@ type CreatePostFormProps = {
   mentionCandidates: MentionPickUser[];
   previewAuthor?: { username: string; avatarUrl: string };
   mentionDirectory?: MentionUserDirectory;
-  selectedSessionId?: string;
-  sessions?: WorkoutSessionWithTitle[];
-  onChangeSessionId?: (sessionId: string) => void;
 };
 
 const EMPTY_MENTION_MAP: MentionUserDirectory = new Map();
 
-const QUICK_TEMPLATES: { id: string; label: string; text: string }[] = [
-  { id: "pr", label: "PR", text: "PR de [ejercicio]: [peso/reps]\nContexto: [sensaciones/técnica]" },
-  { id: "checkin", label: "Check-in", text: "Entreno hecho ✅\nEnfoque: [fuerza/cardio/movilidad]" },
-  {
-    id: "resumen",
-    label: "Resumen",
-    text: "Objetivo de la semana: ...\nLo mejor del entreno: ...\nPróximo paso: ...",
-  },
-  { id: "pregunta", label: "Pregunta", text: "¿Algún consejo para mejorar [ejercicio/meta]? 👀" },
-];
-
-export function CreatePostForm({
+export function CreatePostTrainingForm({
   content,
   visibility,
   pendingImages,
+  selectedSessionId,
+  sessions,
   onChangeContent,
   onChangeVisibility,
+  onChangeSessionId,
   onAddImages,
   onRemoveImage,
-  onMoveImage,
-  onSetCoverImage,
   onCropImage,
   submitDisabled = false,
   submitHint,
@@ -89,14 +74,10 @@ export function CreatePostForm({
   mentionCandidates,
   previewAuthor,
   mentionDirectory,
-  selectedSessionId = "",
-  sessions = [],
-  onChangeSessionId,
-}: CreatePostFormProps) {
+}: CreatePostTrainingFormProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
-  const [sessionInlineOpen, setSessionInlineOpen] = useState(false);
   const slotsLeft = Math.max(0, POST_IMAGE_MAX_FILES - pendingImages.length);
   const currentHint = POST_VISIBILITY_OPTIONS.find((o) => o.value === visibility)?.hint ?? "";
   const mentionDirResolved = mentionDirectory ?? EMPTY_MENTION_MAP;
@@ -104,9 +85,14 @@ export function CreatePostForm({
   const activeImage =
     pendingImages.find((img) => img.id === activeImageId) ?? pendingImages[0] ?? null;
 
+  const mySessions = useMemo(
+    () => [...sessions].sort((a, b) => b.performedAt.localeCompare(a.performedAt)),
+    [sessions],
+  );
+
   const selectedSession = useMemo(
-    () => sessions.find((s) => s.id === selectedSessionId) ?? null,
-    [sessions, selectedSessionId],
+    () => mySessions.find((s) => s.id === selectedSessionId) ?? null,
+    [mySessions, selectedSessionId],
   );
 
   const exercisePreviews = useMemo(
@@ -130,20 +116,6 @@ export function CreatePostForm({
     };
   }, [selectedSession?.snapshot]);
 
-  const linkedSessionPreview = selectedSession
-    ? {
-        workoutTitle: selectedSession.workoutTitle,
-        performedAt: selectedSession.performedAt,
-        metrics: sessionMetrics,
-        exercisePreviews,
-        moreExercisesCount,
-      }
-    : null;
-
-  useEffect(() => {
-    if (!selectedSessionId) setSessionInlineOpen(false);
-  }, [selectedSessionId]);
-
   useEffect(() => {
     if (pendingImages.length === 0) {
       setActiveImageId(null);
@@ -156,9 +128,16 @@ export function CreatePostForm({
 
   const openFilePicker = () => fileRef.current?.click();
   const focusCaption = () => {
-    const panel = document.getElementById("create-post-caption-panel");
-    panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    panel?.querySelector("textarea")?.focus();
+    document.getElementById("create-post-training-caption")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    document.querySelector<HTMLTextAreaElement>("#create-post-training-caption textarea")?.focus();
+  };
+
+  const handleSessionChange = (sessionId: string) => {
+    onChangeSessionId(sessionId);
+    const session = mySessions.find((s) => s.id === sessionId);
+    if (session && !content.trim()) {
+      onChangeContent(sessionPostTemplate(session.workoutTitle));
+    }
   };
 
   return (
@@ -180,32 +159,42 @@ export function CreatePostForm({
       <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
         <div className="min-w-0">
           {previewAuthor ? (
-            <PostFeedPreviewStandard
+            <PostFeedPreviewTraining
               username={previewAuthor.username}
               avatarUrl={previewAuthor.avatarUrl}
               visibility={visibility}
               content={content}
+              sessionId={selectedSessionId || null}
+              workoutTitle={selectedSession?.workoutTitle}
+              performedAt={selectedSession?.performedAt}
+              metrics={sessionMetrics}
+              exercisePreviews={exercisePreviews}
+              moreExercisesCount={moreExercisesCount}
               imageUrls={imageUrls}
               editorMode
               mentionDirectory={mentionDirResolved}
-              onPressAddMedia={openFilePicker}
+              onPressLinkSession={() => setSessionPickerOpen(true)}
               onPressEditCaption={focusCaption}
-              showSessionInline={sessionInlineOpen && Boolean(selectedSessionId)}
-              sessionPreviewActive={sessionInlineOpen}
-              onPressSessionPreview={
-                selectedSessionId
-                  ? () => setSessionInlineOpen((open) => !open)
-                  : undefined
-              }
-              linkedSession={linkedSessionPreview}
+              onPressAddMedia={openFilePicker}
             />
           ) : null}
         </div>
 
         <div className="grid gap-3">
+          <CreatePostSessionField
+            sessions={sessions}
+            selectedSessionId={selectedSessionId}
+            onChangeSessionId={handleSessionChange}
+            open={sessionPickerOpen}
+            onOpenChange={setSessionPickerOpen}
+            hint="Recomendado para contextualizar el entreno."
+          />
+
           {pendingImages.length > 0 ? (
             <div className="rounded-xl border border-neutral-800/85 bg-black/25 p-3 light:border-zinc-200 light:bg-zinc-50">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Fotos</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Fotos (opcional)
+              </p>
               <div className="flex flex-wrap gap-2">
                 {pendingImages.map((img, idx) => (
                   <button
@@ -216,12 +205,11 @@ export function CreatePostForm({
                       img.id === activeImage?.id ? "border-goi-gold" : "border-neutral-700 light:border-zinc-300",
                     ].join(" ")}
                     onClick={() => setActiveImageId(img.id)}
-                    aria-label={`Foto ${idx + 1}`}
                   >
                     <img src={img.dataUrl} alt="" className="size-full object-cover" />
                     {idx === 0 ? (
                       <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-center text-[9px] font-bold text-goi-gold">
-                        Portada
+                        1ª
                       </span>
                     ) : null}
                   </button>
@@ -232,7 +220,6 @@ export function CreatePostForm({
                     className="flex size-16 items-center justify-center rounded-lg border border-dashed border-neutral-600 text-xl text-goi-gold"
                     onClick={openFilePicker}
                     disabled={mediaBusy}
-                    aria-label="Añadir foto"
                   >
                     +
                   </button>
@@ -243,78 +230,34 @@ export function CreatePostForm({
                   <Button type="button" variant="secondary" disabled={mediaBusy} onClick={openFilePicker}>
                     Añadir
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={mediaBusy}
-                    onClick={() => onCropImage(activeImage.id)}
-                  >
+                  <Button type="button" variant="secondary" disabled={mediaBusy} onClick={() => onCropImage(activeImage.id)}>
                     Recortar
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={mediaBusy}
-                    onClick={() => onSetCoverImage(activeImage.id)}
-                  >
-                    Portada
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={mediaBusy}
-                    onClick={() => onMoveImage(activeImage.id, "left")}
-                  >
-                    ←
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={mediaBusy}
-                    onClick={() => onMoveImage(activeImage.id, "right")}
-                  >
-                    →
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={mediaBusy}
-                    onClick={() => onRemoveImage(activeImage.id)}
-                  >
+                  <Button type="button" variant="secondary" disabled={mediaBusy} onClick={() => onRemoveImage(activeImage.id)}>
                     Quitar
                   </Button>
                 </div>
               ) : null}
             </div>
           ) : (
-            <Button type="button" disabled={mediaBusy} onClick={openFilePicker}>
-              Añadir foto (obligatoria)
+            <Button type="button" variant="secondary" disabled={mediaBusy} onClick={openFilePicker}>
+              Añadir foto (opcional)
             </Button>
           )}
 
-          {onChangeSessionId ? (
-            <CreatePostSessionField
-              sessions={sessions}
-              selectedSessionId={selectedSessionId}
-              onChangeSessionId={onChangeSessionId}
-              open={sessionPickerOpen}
-              onOpenChange={setSessionPickerOpen}
-            />
-          ) : null}
-
-          <label id="create-post-caption-panel" className="grid gap-2 font-semibold">
-            Pie de foto
-            <span className="text-xs font-normal text-neutral-500">Opcional si hay foto. Escribe @ para mencionar.</span>
+          <label id="create-post-training-caption" className="grid gap-2 font-semibold">
+            Comentario del entreno
+            <span className="text-xs font-normal text-neutral-500">Opcional si hay sesión o foto. Mín. 4 caracteres sin foto.</span>
             <div className="flex flex-wrap gap-1.5">
-              {QUICK_TEMPLATES.map((template) => (
+              {CAPTION_PROMPTS_TRAINING.map((text) => (
                 <button
-                  key={template.id}
+                  key={text}
                   type="button"
                   className="rounded-full border border-neutral-700 bg-neutral-900/80 px-2.5 py-1 text-[11px] font-semibold text-neutral-300 hover:border-goi-gold/60 hover:text-goi-gold light:border-zinc-300 light:bg-zinc-100 light:text-zinc-700"
-                  onClick={() => onApplyTemplate?.(template.text)}
+                  onClick={() => onApplyTemplate?.(text)}
                   disabled={mediaBusy}
                 >
-                  {template.label}
+                  {text}
                 </button>
               ))}
             </div>
@@ -327,7 +270,7 @@ export function CreatePostForm({
               rows={4}
               maxLength={POST_BODY_MAX}
               className="goi-field min-h-[120px] w-full resize-none rounded-xl border-neutral-700/90 bg-black/55 px-3 py-3 light:border-zinc-300 light:bg-white"
-              placeholder="Pie de foto opcional…"
+              placeholder="¿Cómo fue el entreno?"
               listPlacement="below"
             />
             {content.trim() ? (
@@ -343,7 +286,6 @@ export function CreatePostForm({
               className="goi-field"
               value={visibility}
               onChange={(e) => onChangeVisibility(e.target.value as Visibility)}
-              aria-describedby="post-visibility-hint"
             >
               {POST_VISIBILITY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -351,9 +293,7 @@ export function CreatePostForm({
                 </option>
               ))}
             </select>
-            <p id="post-visibility-hint" className="text-xs text-neutral-500">
-              {currentHint}
-            </p>
+            <p className="text-xs text-neutral-500">{currentHint}</p>
           </fieldset>
         </div>
       </div>
@@ -373,15 +313,6 @@ export function CreatePostForm({
             <span>{transferState.message}</span>
             <span>{Math.max(0, Math.min(100, Math.round(transferState.progress)))}%</span>
           </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-neutral-800/90 light:bg-zinc-200">
-            <div
-              className={[
-                "h-full rounded-full transition-[width] duration-200",
-                transferState.phase === "error" ? "bg-red-500" : "bg-goi-gold",
-              ].join(" ")}
-              style={{ width: `${Math.max(4, Math.min(100, transferState.progress))}%` }}
-            />
-          </div>
         </div>
       ) : null}
 
@@ -389,7 +320,7 @@ export function CreatePostForm({
 
       <div className="flex justify-end pt-1">
         <Button type="submit" disabled={submitDisabled || !canSubmit} className="w-full sm:w-auto">
-          Publicar
+          Publicar training
         </Button>
       </div>
     </form>

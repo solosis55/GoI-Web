@@ -53,7 +53,7 @@ function appendCreatePostFields(form: FormData, input: CreatePostInput) {
 
 export async function createPost(input: CreatePostPayload) {
   const sessionId = input.sessionId ?? null;
-  const format = input.format ?? (sessionId ? "training" : "standard");
+  const format = input.format ?? "standard";
 
   if (input.uploadFiles && input.uploadFiles.length > 0) {
     const form = new FormData();

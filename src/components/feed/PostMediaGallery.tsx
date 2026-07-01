@@ -15,13 +15,15 @@ type PostMediaGalleryProps = {
   layout?: PostMediaGalleryLayout;
   /** Feed: carrusel con varias fotos, lightbox al pulsar, teclado en el visor. */
   feedInteractive?: boolean;
+  /** Training inset: tope de altura de la imagen (px). */
+  insetMaxHeight?: number;
 };
 
 function isImage(m: PostMediaItem): m is PostMediaItem & { type: "image" } {
   return m.type === "image";
 }
 
-export function PostMediaGallery({ media, layout = "inline", feedInteractive = false }: PostMediaGalleryProps) {
+export function PostMediaGallery({ media, layout = "inline", feedInteractive = false, insetMaxHeight }: PostMediaGalleryProps) {
   const resolvedMedia = useMemo(() => resolvePostMedia(media), [media]);
   const imageItems = useMemo(() => resolvedMedia.filter(isImage), [resolvedMedia]);
   const urls = useMemo(() => imageItems.map((i) => i.url), [imageItems]);
@@ -82,14 +84,17 @@ export function PostMediaGallery({ media, layout = "inline", feedInteractive = f
 
   /** Hero del feed: carrusel + lightbox (no enlaces directos al asset). */
   if (feedInteractive && hero && urls.length > 0) {
-    const shellClass = [
-      "mt-0 w-full rounded-none border-0 border-t border-neutral-800/65 bg-neutral-950/45 shadow-none light:border-zinc-200/90 light:bg-zinc-100/60",
-    ].join(" ");
+    const shellClass = insetMaxHeight
+      ? "w-full border-0 bg-transparent shadow-none"
+      : [
+          "mt-0 w-full rounded-none border-0 border-t border-neutral-800/65 bg-neutral-950/45 shadow-none light:border-zinc-200/90 light:bg-zinc-100/60",
+        ].join(" ");
 
     const heroImgStyle: CSSProperties = {
-      maxHeight: "min(92vh, 1400px)",
+      maxHeight: insetMaxHeight ? `${insetMaxHeight}px` : "min(92vh, 1400px)",
       width: "100%",
       height: "auto",
+      objectFit: insetMaxHeight ? "cover" : undefined,
     };
 
     return (

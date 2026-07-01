@@ -46,35 +46,39 @@ export function PostMediaLightbox({ open, urls, index, onClose, onIndexChange }:
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex flex-col bg-black/92 p-2 sm:p-4"
+      className="fixed inset-0 z-[100] flex flex-col bg-black"
       role="dialog"
       aria-modal="true"
       aria-label="Vista ampliada de la imagen"
-      onClick={onClose}
     >
-      <div className="flex shrink-0 items-center justify-between gap-2 pb-2" onClick={(e) => e.stopPropagation()}>
-        <span className="text-xs text-neutral-400">
-          {urls.length > 1 ? `${safeIndex + 1} / ${urls.length}` : ""}
-        </span>
+      <div
+        className="flex shrink-0 items-center justify-between gap-3 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-4"
+        style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+      >
         <button
           type="button"
-          className="rounded-lg border border-neutral-600 px-3 py-1.5 text-sm text-neutral-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-[2rem] font-light leading-none text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50"
           onClick={onClose}
+          aria-label="Volver al feed"
         >
-          Cerrar
+          ×
         </button>
+        {urls.length > 1 ? (
+          <span className="text-sm font-semibold text-white/85">
+            {safeIndex + 1} / {urls.length}
+          </span>
+        ) : (
+          <span className="min-w-11" aria-hidden />
+        )}
       </div>
 
-      <div
-        className="relative flex min-h-0 flex-1 items-center justify-center"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative flex min-h-0 flex-1 items-center justify-center px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-2">
         {urls.length > 1 ? (
           <>
             <button
               type="button"
               aria-label="Imagen anterior"
-              className="absolute left-1 top-1/2 z-[1] -translate-y-1/2 rounded-full border border-white/20 bg-black/50 px-3 py-2 text-lg text-white hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50 sm:left-2"
+              className="absolute left-1 top-1/2 z-[2] -translate-y-1/2 rounded-full border border-white/20 bg-black/55 px-3 py-2 text-lg text-white hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50 sm:left-3"
               onClick={() => onIndexChange(safeIndex <= 0 ? urls.length - 1 : safeIndex - 1)}
             >
               ‹
@@ -82,7 +86,7 @@ export function PostMediaLightbox({ open, urls, index, onClose, onIndexChange }:
             <button
               type="button"
               aria-label="Imagen siguiente"
-              className="absolute right-1 top-1/2 z-[1] -translate-y-1/2 rounded-full border border-white/20 bg-black/50 px-3 py-2 text-lg text-white hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50 sm:right-2"
+              className="absolute right-1 top-1/2 z-[2] -translate-y-1/2 rounded-full border border-white/20 bg-black/55 px-3 py-2 text-lg text-white hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50 sm:right-3"
               onClick={() => onIndexChange(safeIndex >= urls.length - 1 ? 0 : safeIndex + 1)}
             >
               ›
@@ -90,13 +94,24 @@ export function PostMediaLightbox({ open, urls, index, onClose, onIndexChange }:
           </>
         ) : null}
 
-        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- imagen ampliada */}
-        <img
-          src={url}
-          alt=""
-          className="max-h-[min(88vh,1200px)] max-w-full touch-manipulation object-contain"
-        />
+        <button
+          type="button"
+          className="flex max-h-full max-w-full cursor-zoom-out items-center justify-center border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-goi-gold/50"
+          onClick={onClose}
+          aria-label="Cerrar vista ampliada"
+        >
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- imagen ampliada */}
+          <img
+            src={url}
+            alt=""
+            className="max-h-[min(88vh,1200px)] max-w-full touch-manipulation object-contain"
+          />
+        </button>
       </div>
+
+      <p className="pointer-events-none shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-[11px] font-medium text-white/45">
+        Toca la imagen o × para volver
+      </p>
     </div>,
     document.body,
   );

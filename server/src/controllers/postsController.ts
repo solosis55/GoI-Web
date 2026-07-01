@@ -179,6 +179,7 @@ function mapPostWithInteractions(post: Post, viewerUserId: string) {
   return {
     ...post,
     ...resolvePostSessionMeta(post),
+    hasMedia: !!(post.media && post.media.length > 0),
     authorUsername: author?.username ?? "Usuario",
     authorAvatarUrl: author?.avatarUrl ?? "",
     likesCount: likes.length,

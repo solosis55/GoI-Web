@@ -422,6 +422,7 @@ function AppContent() {
                   setExternalProfileVisit(null);
                   goTo("profile");
                 }}
+                onGoToWorkouts={() => goTo("workouts")}
               />
             )}
           </PageContainer>

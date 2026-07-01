@@ -2,6 +2,11 @@ export type PostFormat = "standard" | "training";
 
 export type PostMediaItem = { type: "image"; url: string };
 
+export type SessionExercisePreview = {
+  exerciseName: string;
+  summary: string;
+};
+
 export type Post = {
   id: string;
   userId: string;
@@ -19,6 +24,15 @@ export type Post = {
   likesCount: number;
   likedByMe?: boolean;
   comments: PostComment[];
+  /** Enriquecido por API cuando hay sessionId (posts Training). */
+  sessionWorkoutTitle?: string | null;
+  sessionPerformedAt?: string | null;
+  sessionCompletedSets?: number | null;
+  sessionTotalSets?: number | null;
+  sessionCompletedExercises?: number | null;
+  sessionTotalExercises?: number | null;
+  sessionExercisePreviews?: SessionExercisePreview[];
+  sessionMoreExercisesCount?: number;
 };
 
 export type PostComment = {
